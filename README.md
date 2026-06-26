@@ -143,13 +143,22 @@ Generated `backend/main.go`:
 ```go
 package backend
 
-type Context interface{}
+import "github.com/j0j1j2/gogi/sdk"
 
-func Init(ctx Context) {
+func Init(ctx *sdk.Context) {
+    ctx.Logf("backend initialized")
+
+    // ctx.RegisterPatch(sdk.Patch{
+    //     ID:      "example_patch",
+    //     Library: "libtarget.so",
+    //     RVA:     0x1234,
+    //     Expect:  []byte{0x00},
+    //     Replace: []byte{0x01},
+    // })
 }
 ```
 
-`Init` is called when the generated payload starts. The current SDK surface is intentionally small; patches and richer menu actions are being moved into backend code instead of `gogi.toml`.
+`Init` is called when the generated payload starts. `ctx.RegisterPatch` adds a typed memory patch to the runtime registry, so it appears in `/api/state` and the generated WebView menu.
 
 ## Build Integration
 

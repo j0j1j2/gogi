@@ -1,20 +1,20 @@
 name = "basic_patch"
+
+[build]
 package = "com.example.target"
 abis = ["arm64-v8a"]
-api = 24
-entry = ["jni_onload", "modinit"]
-menu_backend = "webview"
+min_sdk = 24
 
-[[patches]]
-id = "sample_patch"
-library = "libtarget.so"
-rva = "0x0"
-expect = "00"
-replace = "00"
-startup = false
+[overlay]
+enabled = true
+mode = "webview"
+width = 320
+height = 420
+collapsed_size = 56
+draggable = true
 
-[[menu.toggles]]
-id = "sample_patch"
-label = "Sample Patch"
-patch = "sample_patch"
-initial = false
+[frontend]
+entry = "frontend/index.html"
+
+[backend]
+entry = "backend"

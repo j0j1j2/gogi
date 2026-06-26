@@ -49,7 +49,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "%s is valid\n", path)
 		return 0
-	case "build":
+	case "compile":
 		abi := "arm64-v8a"
 		api := 24
 		for i := 1; i < len(args); i++ {
@@ -73,14 +73,8 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 					return 2
 				}
 				api = parsed
-			case "--menu":
-				i++
-				if i >= len(args) {
-					fmt.Fprintln(stderr, "--menu requires a value")
-					return 2
-				}
 			default:
-				fmt.Fprintf(stderr, "unknown build flag %q\n", args[i])
+				fmt.Fprintf(stderr, "unknown compile flag %q\n", args[i])
 				return 2
 			}
 		}
@@ -95,6 +89,40 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "GOOS=%s GOARCH=%s CGO_ENABLED=1 CC=%s go build -buildmode=c-shared -o dist/%s/libgogi.so ./payload\n", cfg.GoOS, cfg.GoArch, cfg.CC, cfg.ABI)
 		return 0
+	case "build":
+		target := ""
+		out := ""
+		for i := 1; i < len(args); i++ {
+			switch args[i] {
+			case "--apk", "--xapk":
+				i++
+				if i >= len(args) {
+					fmt.Fprintf(stderr, "%s requires a value\n", args[i-1])
+					return 2
+				}
+				target = args[i]
+			case "--out":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--out requires a value")
+					return 2
+				}
+				out = args[i]
+			default:
+				fmt.Fprintf(stderr, "unknown build flag %q\n", args[i])
+				return 2
+			}
+		}
+		if target == "" {
+			fmt.Fprintln(stderr, "usage: gogi build --apk <path>|--xapk <path> [--out <path>]")
+			return 2
+		}
+		if out == "" {
+			fmt.Fprintln(stderr, "--out is required")
+			return 2
+		}
+		fmt.Fprintln(stderr, "APK/XAPK integration is not implemented yet")
+		return 1
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
 		printHelp(stderr)
@@ -122,5 +150,6 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  gogi init <name>")
 	fmt.Fprintln(w, "  gogi validate [manifest]")
-	fmt.Fprintln(w, "  gogi build [--abi arm64-v8a] [--api 24] [--menu webview]")
+	fmt.Fprintln(w, "  gogi compile [--abi arm64-v8a] [--api 24]")
+	fmt.Fprintln(w, "  gogi build --apk <path>|--xapk <path> --out <path>")
 }

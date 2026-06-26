@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestInitProjectCreatesManifestAndPayload(t *testing.T) {
+func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 	root := t.TempDir()
 	if err := InitProject(root, "sample"); err != nil {
 		t.Fatalf("InitProject returned error: %v", err)
@@ -14,14 +14,18 @@ func TestInitProjectCreatesManifestAndPayload(t *testing.T) {
 
 	required := []string{
 		"gogi.toml",
-		"payload/main.go",
-		"payload/menu/assets/menu.html",
-		"payload/menu/assets/menu.css",
-		"payload/menu/assets/menu.js",
+		"frontend/index.html",
+		"frontend/style.css",
+		"frontend/main.js",
+		"backend/main.go",
 	}
 	for _, rel := range required {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
 			t.Fatalf("expected %s to exist: %v", rel, err)
 		}
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "payload")); !os.IsNotExist(err) {
+		t.Fatalf("init must not create user-editable payload directory, stat err=%v", err)
 	}
 }

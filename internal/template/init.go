@@ -8,11 +8,11 @@ import (
 
 func InitProject(root string, name string) error {
 	files := map[string]string{
-		"gogi.toml":                     manifestTemplate(name),
-		"payload/main.go":               payloadMainTemplate(),
-		"payload/menu/assets/menu.html": "<!doctype html><html><head><link rel=\"stylesheet\" href=\"/menu.css\"></head><body><main id=\"app\"></main><script src=\"/menu.js\"></script></body></html>\n",
-		"payload/menu/assets/menu.css":  "body{margin:0;font-family:sans-serif;background:rgba(18,18,18,.78);color:#f5f1e8}button{min-height:44px}\n",
-		"payload/menu/assets/menu.js":   "fetch('/api/state').then(r=>r.json()).then(s=>{document.getElementById('app').textContent=JSON.stringify(s)})\n",
+		"gogi.toml":          manifestTemplate(name),
+		"frontend/index.html": frontendIndexTemplate(),
+		"frontend/style.css":  frontendStyleTemplate(),
+		"frontend/main.js":    frontendScriptTemplate(),
+		"backend/main.go":     backendMainTemplate(),
 	}
 
 	for rel, content := range files {
@@ -29,41 +29,104 @@ func InitProject(root string, name string) error {
 
 func manifestTemplate(name string) string {
 	return fmt.Sprintf(`name = %q
+
+[build]
 package = "com.example.target"
 abis = ["arm64-v8a"]
-api = 24
-entry = ["jni_onload", "modinit"]
-menu_backend = "webview"
+min_sdk = 24
 
-[[patches]]
-id = "sample_patch"
-library = "libtarget.so"
-rva = "0x0"
-expect = "00"
-replace = "00"
-startup = false
+[overlay]
+enabled = true
+mode = "webview"
+width = 320
+height = 420
+collapsed_size = 56
+draggable = true
 
-[[menu.toggles]]
-id = "sample_patch"
-label = "Sample Patch"
-patch = "sample_patch"
-initial = false
+[frontend]
+entry = "frontend/index.html"
+
+[backend]
+entry = "backend"
 `, name)
 }
 
-func payloadMainTemplate() string {
-	return `package main
-
-import "C"
-
-//export ModInit
-func ModInit() {}
-
-//export JNI_OnLoad
-func JNI_OnLoad(vm uintptr, reserved uintptr) int {
-	return 0x00010006
+func frontendIndexTemplate() string {
+	return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <title>gogi menu</title>
+</head>
+<body>
+  <main id="app">
+    <h1>gogi</h1>
+    <section id="actions"></section>
+  </main>
+  <script src="main.js"></script>
+</body>
+</html>
+`
 }
 
-func main() {}
+func frontendStyleTemplate() string {
+	return `:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: rgba(18, 20, 22, 0.9);
+  color: #f4f7f8;
+}
+
+#app {
+  padding: 14px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #2f7d68;
+  color: #ffffff;
+  font: inherit;
+}
+`
+}
+
+func frontendScriptTemplate() string {
+	return `async function refresh() {
+  const actions = document.getElementById("actions");
+  try {
+    const response = await fetch("/api/state");
+    const state = await response.json();
+    actions.textContent = JSON.stringify(state, null, 2);
+  } catch (error) {
+    actions.textContent = String(error);
+  }
+}
+
+refresh();
+`
+}
+
+func backendMainTemplate() string {
+	return `package backend
+
+type Context interface{}
+
+func Init(ctx Context) {
+}
 `
 }

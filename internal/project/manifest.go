@@ -8,34 +8,34 @@ import (
 )
 
 type Manifest struct {
-	Name        string     `toml:"name"`
-	Package     string     `toml:"package"`
-	ABIs        []string   `toml:"abis"`
-	API         int        `toml:"api"`
-	Entry       []string   `toml:"entry"`
-	MenuBackend string     `toml:"menu_backend"`
-	Patches     []Patch    `toml:"patches"`
-	Menu        MenuConfig `toml:"menu"`
+	Name     string         `toml:"name"`
+	Build    BuildConfig    `toml:"build"`
+	Overlay  OverlayConfig  `toml:"overlay"`
+	Frontend FrontendConfig `toml:"frontend"`
+	Backend  BackendConfig  `toml:"backend"`
 }
 
-type MenuConfig struct {
-	Toggles []MenuToggle `toml:"toggles"`
+type BuildConfig struct {
+	Package string   `toml:"package"`
+	ABIs    []string `toml:"abis"`
+	MinSDK  int      `toml:"min_sdk"`
 }
 
-type Patch struct {
-	ID      string `toml:"id"`
-	Library string `toml:"library"`
-	RVA     string `toml:"rva"`
-	Expect  string `toml:"expect"`
-	Replace string `toml:"replace"`
-	Startup bool   `toml:"startup"`
+type OverlayConfig struct {
+	Enabled       bool   `toml:"enabled"`
+	Mode          string `toml:"mode"`
+	Width         int    `toml:"width"`
+	Height        int    `toml:"height"`
+	CollapsedSize int    `toml:"collapsed_size"`
+	Draggable     bool   `toml:"draggable"`
 }
 
-type MenuToggle struct {
-	ID      string `toml:"id"`
-	Label   string `toml:"label"`
-	Patch   string `toml:"patch"`
-	Initial bool   `toml:"initial"`
+type FrontendConfig struct {
+	Entry string `toml:"entry"`
+}
+
+type BackendConfig struct {
+	Entry string `toml:"entry"`
 }
 
 func LoadManifest(path string) (*Manifest, error) {
@@ -50,54 +50,23 @@ func (m *Manifest) Validate() error {
 	if strings.TrimSpace(m.Name) == "" {
 		return fmt.Errorf("name is required")
 	}
-	if strings.TrimSpace(m.Package) == "" {
-		return fmt.Errorf("package is required")
+	if strings.TrimSpace(m.Build.Package) == "" {
+		return fmt.Errorf("build package is required")
 	}
-	if len(m.ABIs) == 0 {
+	if len(m.Build.ABIs) == 0 {
 		return fmt.Errorf("at least one ABI is required")
 	}
-	if m.API == 0 {
-		return fmt.Errorf("api is required")
+	if m.Build.MinSDK == 0 {
+		return fmt.Errorf("build min_sdk is required")
 	}
-
-	patchIDs := map[string]bool{}
-	for _, patch := range m.Patches {
-		if patch.ID == "" {
-			return fmt.Errorf("patch id is required")
-		}
-		if patchIDs[patch.ID] {
-			return fmt.Errorf("duplicate patch id %q", patch.ID)
-		}
-		patchIDs[patch.ID] = true
-		if patch.Library == "" {
-			return fmt.Errorf("patch %q library is required", patch.ID)
-		}
-		if patch.RVA == "" {
-			return fmt.Errorf("patch %q rva is required", patch.ID)
-		}
-		expect, err := ParseHexBytes(patch.Expect)
-		if err != nil {
-			return fmt.Errorf("patch %q expect: %w", patch.ID, err)
-		}
-		replace, err := ParseHexBytes(patch.Replace)
-		if err != nil {
-			return fmt.Errorf("patch %q replace: %w", patch.ID, err)
-		}
-		if len(expect) != 0 && len(replace) != 0 && len(expect) != len(replace) {
-			return fmt.Errorf("patch %q expect and replace lengths differ", patch.ID)
-		}
+	if m.Overlay.Enabled && strings.TrimSpace(m.Overlay.Mode) == "" {
+		return fmt.Errorf("overlay mode is required")
 	}
-
-	for _, toggle := range m.Menu.Toggles {
-		if toggle.ID == "" {
-			return fmt.Errorf("menu toggle id is required")
-		}
-		if toggle.Label == "" {
-			return fmt.Errorf("menu toggle %q label is required", toggle.ID)
-		}
-		if !patchIDs[toggle.Patch] {
-			return fmt.Errorf("menu toggle %q references unknown patch %q", toggle.ID, toggle.Patch)
-		}
+	if strings.TrimSpace(m.Frontend.Entry) == "" {
+		return fmt.Errorf("frontend entry is required")
+	}
+	if strings.TrimSpace(m.Backend.Entry) == "" {
+		return fmt.Errorf("backend entry is required")
 	}
 
 	return nil

@@ -10,11 +10,18 @@ import (
 type Registry struct {
 	mu      sync.RWMutex
 	patches map[string]PatchRecord
+	applier PatchApplier
+}
+
+type PatchApplier interface {
+	Apply(spec mem.PatchSpec) (mem.AppliedPatch, error)
+	Restore(applied mem.AppliedPatch) error
 }
 
 type PatchRecord struct {
 	Spec    mem.PatchSpec
 	Enabled bool
+	Applied mem.AppliedPatch `json:"-"`
 }
 
 type State struct {
@@ -23,6 +30,12 @@ type State struct {
 
 func NewRegistry() *Registry {
 	return &Registry{patches: map[string]PatchRecord{}}
+}
+
+func (r *Registry) SetApplier(applier PatchApplier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.applier = applier
 }
 
 func (r *Registry) Register(spec mem.PatchSpec) {
@@ -37,6 +50,20 @@ func (r *Registry) Toggle(id string, enabled bool) error {
 	record, ok := r.patches[id]
 	if !ok {
 		return fmt.Errorf("unknown patch %q", id)
+	}
+	if r.applier != nil && record.Enabled != enabled {
+		if enabled {
+			applied, err := r.applier.Apply(record.Spec)
+			if err != nil {
+				return err
+			}
+			record.Applied = applied
+		} else {
+			if err := r.applier.Restore(record.Applied); err != nil {
+				return err
+			}
+			record.Applied = mem.AppliedPatch{}
+		}
 	}
 	record.Enabled = enabled
 	r.patches[id] = record

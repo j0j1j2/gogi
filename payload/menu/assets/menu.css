@@ -18,8 +18,8 @@ body {
 }
 
 .menu {
-  width: min(320px, calc(100vw - 24px));
-  margin: 12px;
+  width: min(300px, calc(100vw - 20px));
+  margin: 8px;
   padding: 12px;
   background: var(--bg);
   border: 1px solid rgba(247, 241, 228, 0.18);
@@ -39,7 +39,7 @@ body {
 }
 
 button {
-  min-height: 44px;
+  min-height: 40px;
   border: 0;
   border-radius: 6px;
   background: rgba(247, 241, 228, 0.12);

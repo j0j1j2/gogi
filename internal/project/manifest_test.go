@@ -3,34 +3,34 @@ package project
 import (
 	"os"
 	"path/filepath"
-	"strings"
+	"reflect"
 	"testing"
 )
 
-func TestLoadManifestAndValidate(t *testing.T) {
+func TestLoadProjectConfigAndValidate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "gogi.toml")
 	data := `
 name = "sample"
+
+[build]
 package = "com.example.target"
 abis = ["arm64-v8a"]
-api = 24
-entry = ["jni_onload", "modinit"]
-menu_backend = "webview"
+min_sdk = 24
 
-[[patches]]
-id = "god_mode"
-library = "libtarget.so"
-rva = "0x1234"
-expect = "00 00 80 52"
-replace = "20 00 80 52"
-startup = false
+[overlay]
+enabled = true
+mode = "webview"
+width = 320
+height = 420
+collapsed_size = 56
+draggable = true
 
-[[menu.toggles]]
-id = "god_mode"
-label = "God Mode"
-patch = "god_mode"
-initial = false
+[frontend]
+entry = "frontend/index.html"
+
+[backend]
+entry = "backend"
 `
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
@@ -43,21 +43,41 @@ initial = false
 	if manifest.Name != "sample" {
 		t.Fatalf("manifest name = %q", manifest.Name)
 	}
+	if manifest.Build.Package != "com.example.target" {
+		t.Fatalf("build package = %q", manifest.Build.Package)
+	}
+	if manifest.Frontend.Entry != "frontend/index.html" {
+		t.Fatalf("frontend entry = %q", manifest.Frontend.Entry)
+	}
 	if err := manifest.Validate(); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
 	}
 }
 
-func TestManifestRejectsMissingPatchReference(t *testing.T) {
+func TestManifestSchemaDoesNotExposePatchConfig(t *testing.T) {
+	manifestType := reflect.TypeOf(Manifest{})
+	if _, ok := manifestType.FieldByName("Patches"); ok {
+		t.Fatal("Manifest must not expose Patches; patch behavior belongs in backend Go code")
+	}
+	if _, ok := manifestType.FieldByName("Menu"); ok {
+		t.Fatal("Manifest must not expose Menu toggles; UI actions belong in backend Go code")
+	}
+}
+
+func TestManifestRejectsMissingBackendEntry(t *testing.T) {
 	manifest := &Manifest{
-		Name:    "sample",
-		Package: "com.example.target",
-		ABIs:    []string{"arm64-v8a"},
-		API:     24,
-		Menu: MenuConfig{
-			Toggles: []MenuToggle{
-				{ID: "missing", Label: "Missing", Patch: "no_patch"},
-			},
+		Name: "sample",
+		Build: BuildConfig{
+			Package: "com.example.target",
+			ABIs:    []string{"arm64-v8a"},
+			MinSDK:  24,
+		},
+		Overlay: OverlayConfig{
+			Enabled: true,
+			Mode:    "webview",
+		},
+		Frontend: FrontendConfig{
+			Entry: "frontend/index.html",
 		},
 	}
 
@@ -65,7 +85,7 @@ func TestManifestRejectsMissingPatchReference(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	if !strings.Contains(err.Error(), "unknown patch") {
-		t.Fatalf("error should mention unknown patch, got %v", err)
+	if err.Error() != "backend entry is required" {
+		t.Fatalf("expected backend entry error, got %v", err)
 	}
 }

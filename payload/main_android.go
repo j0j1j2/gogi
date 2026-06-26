@@ -19,8 +19,8 @@ func ModInit() {
 }
 
 //export JNI_OnLoad
-func JNI_OnLoad(vm unsafe.Pointer, reserved unsafe.Pointer) C.jint {
-	gogiruntime.Start(vm)
+func JNI_OnLoad(vm *C.JavaVM, reserved unsafe.Pointer) C.jint {
+	gogiruntime.Start(unsafe.Pointer(vm))
 	return C.JNI_VERSION_1_6
 }
 

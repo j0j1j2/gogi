@@ -2,6 +2,7 @@ package buildenv
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 )
 
@@ -37,14 +38,39 @@ func ResolveAndroid(env map[string]string, abi string, api int, hostTag string) 
 		return AndroidConfig{}, fmt.Errorf("unsupported abi %q", abi)
 	}
 
-	cc := filepath.Join(ndk, "toolchains", "llvm", "prebuilt", hostTag, "bin", clang)
+	resolvedHostTag := hostTag
+	cc := filepath.Join(ndk, "toolchains", "llvm", "prebuilt", resolvedHostTag, "bin", clang)
+	if _, err := os.Stat(cc); err != nil {
+		if fallbackHostTag, fallbackCC, ok := findInstalledClang(ndk, clang); ok {
+			resolvedHostTag = fallbackHostTag
+			cc = fallbackCC
+		}
+	}
 	return AndroidConfig{
 		NDKHome: ndk,
 		ABI:     abi,
 		API:     api,
-		HostTag: hostTag,
+		HostTag: resolvedHostTag,
 		GoOS:    "android",
 		GoArch:  goarch,
 		CC:      cc,
 	}, nil
+}
+
+func findInstalledClang(ndk string, clang string) (string, string, bool) {
+	prebuiltRoot := filepath.Join(ndk, "toolchains", "llvm", "prebuilt")
+	entries, err := os.ReadDir(prebuiltRoot)
+	if err != nil {
+		return "", "", false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		cc := filepath.Join(prebuiltRoot, entry.Name(), "bin", clang)
+		if _, err := os.Stat(cc); err == nil {
+			return entry.Name(), cc, true
+		}
+	}
+	return "", "", false
 }

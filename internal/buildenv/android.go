@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type AndroidConfig struct {
@@ -20,6 +21,12 @@ func ResolveAndroid(env map[string]string, abi string, api int, hostTag string) 
 	ndk := env["ANDROID_NDK_HOME"]
 	if ndk == "" {
 		ndk = env["ANDROID_NDK_ROOT"]
+	}
+	if ndk == "" {
+		ndk = findLatestNDK(env["ANDROID_HOME"])
+	}
+	if ndk == "" {
+		ndk = findLatestNDK(env["ANDROID_SDK_ROOT"])
 	}
 	if ndk == "" {
 		return AndroidConfig{}, fmt.Errorf("ANDROID_NDK_HOME or ANDROID_NDK_ROOT is required")
@@ -55,6 +62,27 @@ func ResolveAndroid(env map[string]string, abi string, api int, hostTag string) 
 		GoArch:  goarch,
 		CC:      cc,
 	}, nil
+}
+
+func findLatestNDK(sdk string) string {
+	if sdk == "" {
+		return ""
+	}
+	entries, err := os.ReadDir(filepath.Join(sdk, "ndk"))
+	if err != nil {
+		return ""
+	}
+	var versions []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			versions = append(versions, entry.Name())
+		}
+	}
+	if len(versions) == 0 {
+		return ""
+	}
+	sort.Strings(versions)
+	return filepath.Join(sdk, "ndk", versions[len(versions)-1])
 }
 
 func findInstalledClang(ndk string, clang string) (string, string, bool) {

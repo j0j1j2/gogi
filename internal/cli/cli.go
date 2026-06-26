@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -11,6 +13,10 @@ import (
 	"github.com/j0j1j2/gogi/internal/project"
 	gogitemplate "github.com/j0j1j2/gogi/internal/template"
 )
+
+type runCommandFunc func(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error
+
+var commandRunner runCommandFunc = runCommand
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -81,13 +87,31 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		env := map[string]string{
 			"ANDROID_NDK_HOME": os.Getenv("ANDROID_NDK_HOME"),
 			"ANDROID_NDK_ROOT": os.Getenv("ANDROID_NDK_ROOT"),
+			"ANDROID_HOME":     os.Getenv("ANDROID_HOME"),
+			"ANDROID_SDK_ROOT": os.Getenv("ANDROID_SDK_ROOT"),
 		}
 		cfg, err := buildenv.ResolveAndroid(env, abi, api, defaultHostTag())
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		fmt.Fprintf(stdout, "GOOS=%s GOARCH=%s CGO_ENABLED=1 CC=%s go build -buildmode=c-shared -o dist/%s/libgogi.so ./payload\n", cfg.GoOS, cfg.GoArch, cfg.CC, cfg.ABI)
+		outPath := filepath.Join("dist", cfg.ABI, "libgogi.so")
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		buildEnv := map[string]string{
+			"GOOS":        cfg.GoOS,
+			"GOARCH":      cfg.GoArch,
+			"CGO_ENABLED": "1",
+			"CC":          cfg.CC,
+		}
+		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, "./payload"}
+		if err := commandRunner("go", buildArgs, buildEnv, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "built %s\n", outPath)
 		return 0
 	case "build":
 		target := ""
@@ -152,4 +176,20 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  gogi validate [manifest]")
 	fmt.Fprintln(w, "  gogi compile [--abi arm64-v8a] [--api 24]")
 	fmt.Fprintln(w, "  gogi build --apk <path>|--xapk <path> --out <path>")
+}
+
+func runCommand(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.Env = append(os.Environ(), envSlice(env)...)
+	return cmd.Run()
+}
+
+func envSlice(env map[string]string) []string {
+	items := make([]string, 0, len(env))
+	for key, value := range env {
+		items = append(items, key+"="+value)
+	}
+	return items
 }

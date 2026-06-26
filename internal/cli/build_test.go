@@ -148,6 +148,10 @@ min_sdk = 26
 [overlay]
 enabled = true
 mode = "webview"
+width = 320
+height = 420
+collapsed_size = 56
+draggable = true
 
 [frontend]
 entry = "frontend/index.html"
@@ -171,9 +175,11 @@ entry = "backend"
 	t.Setenv("ANDROID_NDK_ROOT", "")
 
 	var gotEnv map[string]string
+	var gotArgs []string
 	oldRunner := commandRunner
 	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
 		gotEnv = env
+		gotArgs = append([]string(nil), args...)
 		return nil
 	}
 	t.Cleanup(func() { commandRunner = oldRunner })
@@ -187,5 +193,12 @@ entry = "backend"
 	}
 	if gotEnv["CC"] != clang {
 		t.Fatalf("CC = %q, want %q", gotEnv["CC"], clang)
+	}
+	joinedArgs := strings.Join(gotArgs, " ")
+	if !strings.Contains(joinedArgs, "github.com/j0j1j2/gogi/payload/runtime.overlayWidth=320") {
+		t.Fatalf("ldflags missing overlay width: %q", joinedArgs)
+	}
+	if !strings.Contains(joinedArgs, "github.com/j0j1j2/gogi/payload/runtime.overlayDraggable=true") {
+		t.Fatalf("ldflags missing overlay draggable: %q", joinedArgs)
 	}
 }

@@ -58,10 +58,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "compile":
 		abi := "arm64-v8a"
 		api := 24
-		if manifest, ok, err := loadManifestIfPresent("gogi.toml"); err != nil {
+		manifest, ok, err := loadManifestIfPresent("gogi.toml")
+		if err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
-		} else if ok {
+		}
+		if ok {
 			if len(manifest.Build.ABIs) > 0 {
 				abi = manifest.Build.ABIs[0]
 			}
@@ -118,6 +120,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			"CC":          cfg.CC,
 		}
 		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, payloadPackage()}
+		if ldflags := overlayLDFlags(manifest); len(ldflags) > 0 {
+			buildArgs = []string{"build", "-ldflags", joinLDFlags(ldflags), "-buildmode=c-shared", "-o", outPath, payloadPackage()}
+		}
 		if err := commandRunner("go", buildArgs, buildEnv, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
@@ -227,4 +232,34 @@ func loadManifestIfPresent(path string) (*project.Manifest, bool, error) {
 		return nil, false, err
 	}
 	return manifest, true, nil
+}
+
+func overlayLDFlags(manifest *project.Manifest) []string {
+	if manifest == nil || !manifest.Overlay.Enabled {
+		return nil
+	}
+	prefix := "github.com/j0j1j2/gogi/payload/runtime."
+	var flags []string
+	if manifest.Overlay.Width > 0 {
+		flags = append(flags, "-X", prefix+"overlayWidth="+strconv.Itoa(manifest.Overlay.Width))
+	}
+	if manifest.Overlay.Height > 0 {
+		flags = append(flags, "-X", prefix+"overlayHeight="+strconv.Itoa(manifest.Overlay.Height))
+	}
+	if manifest.Overlay.CollapsedSize > 0 {
+		flags = append(flags, "-X", prefix+"overlayCollapsedSize="+strconv.Itoa(manifest.Overlay.CollapsedSize))
+	}
+	flags = append(flags, "-X", prefix+"overlayDraggable="+strconv.FormatBool(manifest.Overlay.Draggable))
+	return flags
+}
+
+func joinLDFlags(flags []string) string {
+	result := ""
+	for i, flag := range flags {
+		if i > 0 {
+			result += " "
+		}
+		result += flag
+	}
+	return result
 }

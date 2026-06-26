@@ -9,6 +9,6 @@ import (
 
 var ErrAutoAttachUnavailable = errors.New("auto_attach_unavailable")
 
-func AttachAuto(vm unsafe.Pointer, url string) error {
+func AttachAuto(vm unsafe.Pointer, url string, configJSON string) error {
 	return ErrAutoAttachUnavailable
 }

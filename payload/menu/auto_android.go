@@ -77,8 +77,8 @@ static jobject gogi_find_activity(JNIEnv* env, int* err_code) {
 	return NULL;
 }
 
-static int gogi_attach_webview(JavaVM* vm, const char* url) {
-	if (vm == NULL || url == NULL) return 1;
+static int gogi_attach_webview(JavaVM* vm, const char* url, const char* config_json) {
+	if (vm == NULL || url == NULL || config_json == NULL) return 1;
 
 	JNIEnv* env = NULL;
 	if ((*vm)->AttachCurrentThread(vm, &env, NULL) != JNI_OK || env == NULL) return 2;
@@ -116,11 +116,13 @@ static int gogi_attach_webview(JavaVM* vm, const char* url) {
 		}
 	}
 	if (helper_cls != NULL) {
-		jmethodID attach_mid = (*env)->GetStaticMethodID(env, helper_cls, "attach", "(Landroid/app/Activity;Ljava/lang/String;)V");
+		jmethodID attach_mid = (*env)->GetStaticMethodID(env, helper_cls, "attach", "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)V");
 		if (attach_mid != NULL && gogi_check(env)) {
 			jstring helper_url = (*env)->NewStringUTF(env, url);
+			jstring helper_config = (*env)->NewStringUTF(env, config_json);
 			if (helper_url == NULL || !gogi_check(env)) return 51;
-			(*env)->CallStaticVoidMethod(env, helper_cls, attach_mid, activity, helper_url);
+			if (helper_config == NULL || !gogi_check(env)) return 53;
+			(*env)->CallStaticVoidMethod(env, helper_cls, attach_mid, activity, helper_url, helper_config);
 			if (!gogi_check(env)) return 52;
 			return 0;
 		}
@@ -209,10 +211,12 @@ import (
 
 var ErrAutoAttachUnavailable = errors.New("auto_attach_unavailable")
 
-func AttachAuto(vm unsafe.Pointer, url string) error {
+func AttachAuto(vm unsafe.Pointer, url string, configJSON string) error {
 	cURL := C.CString(url)
 	defer C.free(unsafe.Pointer(cURL))
-	if code := int(C.gogi_attach_webview((*C.JavaVM)(vm), cURL)); code != 0 {
+	cConfig := C.CString(configJSON)
+	defer C.free(unsafe.Pointer(cConfig))
+	if code := int(C.gogi_attach_webview((*C.JavaVM)(vm), cURL, cConfig)); code != 0 {
 		return fmt.Errorf("%w:%d", ErrAutoAttachUnavailable, code)
 	}
 	return nil

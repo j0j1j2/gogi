@@ -53,7 +53,7 @@ func attachAutoMenu(vm unsafe.Pointer) {
 		Logf("gogi auto menu skipped: no JavaVM")
 		return
 	}
-	if err := menu.AttachAuto(vm, MenuURL()); err != nil {
+	if err := menu.AttachAuto(vm, MenuURL(), overlayConfigJSON()); err != nil {
 		Logf("gogi auto menu attach failed: %v", err)
 		return
 	}
@@ -66,7 +66,7 @@ func attachAutoMenuLoop(vm unsafe.Pointer) {
 			Logf("gogi auto menu skipped: no JavaVM")
 			return
 		}
-		if err := menu.AttachAuto(vm, MenuURL()); err != nil {
+		if err := menu.AttachAuto(vm, MenuURL(), overlayConfigJSON()); err != nil {
 			Logf("gogi auto menu attach attempt %d failed: %v", attempt, err)
 			time.Sleep(150 * time.Millisecond)
 			continue

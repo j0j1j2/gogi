@@ -41,6 +41,9 @@ func startMenuServer() {
 	registry.SetApplier(mem.NewProcessApplier())
 	registry.Register(demoPatchSpec())
 	server := menu.NewServer(registry)
+	if assets := menuAssets(); assets != nil {
+		server = menu.NewServerWithAssets(registry, *assets)
+	}
 	go func() {
 		if err := http.ListenAndServe("127.0.0.1:17373", server.Handler()); err != nil {
 			Logf("gogi menu server stopped: %v", err)

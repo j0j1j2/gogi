@@ -3,7 +3,9 @@ package menu
 import (
 	"embed"
 	"encoding/json"
+	"io/fs"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/j0j1j2/gogi/payload/control"
@@ -14,10 +16,29 @@ var assets embed.FS
 
 type Server struct {
 	registry *control.Registry
+	assets   Assets
+}
+
+type Assets struct {
+	FS    fs.FS
+	Root  string
+	Index string
+	CSS   string
+	JS    string
 }
 
 func NewServer(registry *control.Registry) *Server {
-	return &Server{registry: registry}
+	return NewServerWithAssets(registry, Assets{
+		FS:    assets,
+		Root:  "assets",
+		Index: "menu.html",
+		CSS:   "menu.css",
+		JS:    "menu.js",
+	})
+}
+
+func NewServerWithAssets(registry *control.Registry, assets Assets) *Server {
+	return &Server{registry: registry, assets: assets}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -48,16 +69,16 @@ func (s *Server) handleToggle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
-	name := "menu.html"
+	name := s.assets.Index
 	if r.URL.Path == "/menu.css" {
-		name = "menu.css"
+		name = s.assets.CSS
 		w.Header().Set("content-type", "text/css")
 	}
 	if r.URL.Path == "/menu.js" {
-		name = "menu.js"
+		name = s.assets.JS
 		w.Header().Set("content-type", "application/javascript")
 	}
-	data, err := assets.ReadFile("assets/" + name)
+	data, err := fs.ReadFile(s.assets.FS, path.Join(s.assets.Root, name))
 	if err != nil {
 		http.NotFound(w, r)
 		return

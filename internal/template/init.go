@@ -8,6 +8,7 @@ import (
 
 func InitProject(root string, name string) error {
 	files := map[string]string{
+		"go.mod":             goModTemplate(name),
 		"gogi.toml":          manifestTemplate(name),
 		"frontend/index.html": frontendIndexTemplate(),
 		"frontend/style.css":  frontendStyleTemplate(),
@@ -25,6 +26,13 @@ func InitProject(root string, name string) error {
 		}
 	}
 	return nil
+}
+
+func goModTemplate(name string) string {
+	return fmt.Sprintf(`module %s
+
+go 1.25
+`, name)
 }
 
 func manifestTemplate(name string) string {

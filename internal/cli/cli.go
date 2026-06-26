@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/j0j1j2/gogi/internal/buildenv"
 	"github.com/j0j1j2/gogi/internal/project"
@@ -119,9 +120,20 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			"CGO_ENABLED": "1",
 			"CC":          cfg.CC,
 		}
-		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, payloadPackage()}
+		payloadPkg, err := payloadPackage(manifest)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if payloadPkg == generatedPayloadPackage {
+			if err := commandRunner("go", []string{"get", "github.com/j0j1j2/gogi@latest"}, buildEnv, stdout, stderr); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+		}
+		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, payloadPkg}
 		if ldflags := overlayLDFlags(manifest); len(ldflags) > 0 {
-			buildArgs = []string{"build", "-ldflags", joinLDFlags(ldflags), "-buildmode=c-shared", "-o", outPath, payloadPackage()}
+			buildArgs = []string{"build", "-ldflags", joinLDFlags(ldflags), "-buildmode=c-shared", "-o", outPath, payloadPkg}
 		}
 		if err := commandRunner("go", buildArgs, buildEnv, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
@@ -210,11 +222,19 @@ func envSlice(env map[string]string) []string {
 	return items
 }
 
-func payloadPackage() string {
+const generatedPayloadPackage = "./.gogi/build"
+
+func payloadPackage(manifest *project.Manifest) (string, error) {
 	if info, err := os.Stat("payload"); err == nil && info.IsDir() {
-		return "./payload"
+		return "./payload", nil
 	}
-	return "github.com/j0j1j2/gogi/payload"
+	if manifest == nil {
+		return "github.com/j0j1j2/gogi/payload", nil
+	}
+	if err := writeGeneratedPayload(manifest); err != nil {
+		return "", err
+	}
+	return generatedPayloadPackage, nil
 }
 
 func loadManifestIfPresent(path string) (*project.Manifest, bool, error) {
@@ -262,4 +282,98 @@ func joinLDFlags(flags []string) string {
 		result += flag
 	}
 	return result
+}
+
+func writeGeneratedPayload(manifest *project.Manifest) error {
+	modulePath, err := readModulePath("go.mod")
+	if err != nil {
+		return err
+	}
+	buildDir := filepath.Join(".gogi", "build")
+	if err := os.RemoveAll(buildDir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(buildDir, "frontend"), 0o755); err != nil {
+		return err
+	}
+	if err := copyDir("frontend", filepath.Join(buildDir, "frontend")); err != nil {
+		return fmt.Errorf("copy frontend: %w", err)
+	}
+	source := generatedPayloadSource(modulePath, manifest.Backend.Entry)
+	return os.WriteFile(filepath.Join(buildDir, "main_android.go"), []byte(source), 0o644)
+}
+
+func readModulePath(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "module" {
+			return fields[1], nil
+		}
+	}
+	return "", fmt.Errorf("%s missing module declaration", path)
+}
+
+func copyDir(src string, dst string) error {
+	return filepath.WalkDir(src, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	})
+}
+
+func generatedPayloadSource(modulePath string, backendEntry string) string {
+	backendImport := modulePath + "/" + strings.Trim(backendEntry, "/")
+	return fmt.Sprintf(`package main
+
+/*
+#include <jni.h>
+*/
+import "C"
+
+import (
+	"embed"
+	"unsafe"
+
+	userbackend "%s"
+	gogiruntime "github.com/j0j1j2/gogi/payload/runtime"
+)
+
+//go:embed frontend/*
+var frontendFiles embed.FS
+
+func init() {
+	gogiruntime.SetFrontendAssets(frontendFiles, "frontend")
+	userbackend.Init(nil)
+}
+
+//export ModInit
+func ModInit() {
+	gogiruntime.Start(nil)
+}
+
+//export JNI_OnLoad
+func JNI_OnLoad(vm *C.JavaVM, reserved unsafe.Pointer) C.jint {
+	gogiruntime.Start(unsafe.Pointer(vm))
+	return C.JNI_VERSION_1_6
+}
+
+func main() {}
+`, backendImport)
 }

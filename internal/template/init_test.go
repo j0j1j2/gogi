@@ -13,6 +13,7 @@ func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 	}
 
 	required := []string{
+		"go.mod",
 		"gogi.toml",
 		"frontend/index.html",
 		"frontend/style.css",

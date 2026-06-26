@@ -162,6 +162,21 @@ entry = "backend"
 	if err := os.WriteFile(filepath.Join(dir, "gogi.toml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module sample\n\ngo 1.25\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "frontend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"index.html": "<main>sample</main>",
+		"style.css":  "body{}",
+		"main.js":    "console.log('sample')",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "frontend", name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	oldWd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -178,8 +193,10 @@ entry = "backend"
 	var gotArgs []string
 	oldRunner := commandRunner
 	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
-		gotEnv = env
-		gotArgs = append([]string(nil), args...)
+		if len(args) > 0 && args[0] == "build" {
+			gotEnv = env
+			gotArgs = append([]string(nil), args...)
+		}
 		return nil
 	}
 	t.Cleanup(func() { commandRunner = oldRunner })

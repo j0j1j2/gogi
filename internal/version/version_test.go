@@ -39,3 +39,19 @@ func TestInfoStringUsesDevFallbacks(t *testing.T) {
 		t.Fatalf("version output should use unknown commit fallback:\n%s", out)
 	}
 }
+
+func TestInfoStringDerivesCommitFromPseudoVersion(t *testing.T) {
+	info := Info{
+		Version: "v0.0.0-20260626150848-e62a5e8ed81e",
+		Go:      "go1.25",
+	}
+
+	out := info.String()
+
+	if !strings.Contains(out, "commit e62a5e8ed81e") {
+		t.Fatalf("version output should derive commit from pseudo-version:\n%s", out)
+	}
+	if !strings.Contains(out, "date 2026-06-26T15:08:48Z") {
+		t.Fatalf("version output should derive date from pseudo-version:\n%s", out)
+	}
+}

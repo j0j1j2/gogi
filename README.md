@@ -2,7 +2,7 @@
 
 `gogi` is short for Go Game Injector.
 
-`gogi` builds Go-based Android injectable shared libraries for CTF and controlled research targets.
+`gogi` builds Go-based Android injectable shared libraries for game mod tooling.
 
 ## MVP workflow
 

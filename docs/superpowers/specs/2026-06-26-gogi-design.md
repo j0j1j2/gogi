@@ -4,7 +4,7 @@ Date: 2026-06-26
 
 ## Purpose
 
-`gogi` is a Go-based builder for Android injectable shared libraries used in CTF and controlled research environments. The payload is written primarily in Go and built as an Android `.so` with `go build -buildmode=c-shared`.
+`gogi` is a Go-based builder for Android injectable shared libraries used for game mod tooling. The payload is written primarily in Go and built as an Android `.so` with `go build -buildmode=c-shared`.
 
 The first-class use case is an in-process Android native payload that can:
 
@@ -115,7 +115,7 @@ func JNI_OnLoad(vm unsafe.Pointer, reserved unsafe.Pointer) C.jint
 
 `JNI_OnLoad` supports normal Android library loading paths such as `System.loadLibrary`.
 
-`ModInit` supports explicit `dlopen + dlsym + call` style loaders in CTF setups.
+`ModInit` supports explicit `dlopen + dlsym + call` style loaders.
 
 The runtime must guard startup with `sync.Once` so both entries can be present without double-initializing the payload.
 
@@ -284,7 +284,7 @@ Because injectable contexts vary, backend initialization supports multiple modes
 
 1. `JNI_OnLoad` captures `JavaVM`.
 2. Explicit exported entry can receive an Activity/Context when a loader can provide one.
-3. App-specific adapters can be added later for CTF targets that expose a known Activity path.
+3. App-specific adapters can be added later for targets that expose a known Activity path.
 
 The first implementation should make the context dependency explicit. Automatic Activity discovery can be a later enhancement.
 
@@ -332,7 +332,7 @@ Manual Android validation:
 
 - build `arm64-v8a` payload
 - load with `System.loadLibrary` in a test app
-- load with `dlopen + ModInit` in a CTF harness
+- load with `dlopen + ModInit` in a smoke harness
 - verify logcat startup
 - verify RVA patch apply/restore
 - verify WebView menu show/hide

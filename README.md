@@ -2,6 +2,18 @@
 
 `gogi` (Go Game Injector) builds native Android game mod libraries in Go.
 
+## Install
+
+```bash
+go install github.com/j0j1j2/gogi/cmd/gogi@latest
+```
+
+Make sure your Go bin directory is on `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
 ## MVP workflow
 
 ```bash

@@ -21,6 +21,7 @@ type runCommandFunc func(name string, args []string, env map[string]string, stdo
 var commandRunner runCommandFunc = runCommand
 var apkBuilder = apkbuild.BuildAPK
 var xapkBuilder = apkbuild.BuildXAPK
+var dependencyResolver = resolveProjectDependencies
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -40,6 +41,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if err := gogitemplate.InitProject(args[1], args[1]); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
+		}
+		if err := dependencyResolver(args[1], stdout, stderr); err != nil {
+			fmt.Fprintf(stderr, "warning: initialize sdk dependency: %v\n", err)
 		}
 		fmt.Fprintf(stdout, "created %s\n", args[1])
 		return 0
@@ -282,6 +286,14 @@ func runCommand(name string, args []string, env map[string]string, stdout io.Wri
 	return cmd.Run()
 }
 
+func resolveProjectDependencies(root string, stdout io.Writer, stderr io.Writer) error {
+	cmd := exec.Command("go", "get", "github.com/j0j1j2/gogi@latest")
+	cmd.Dir = root
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	return cmd.Run()
+}
+
 func resolveExecutable(name string) string {
 	if path, err := exec.LookPath(name); err == nil {
 		return path
@@ -455,6 +467,7 @@ import (
 	"unsafe"
 
 	userbackend "%s"
+	"github.com/j0j1j2/gogi/sdk"
 	gogiruntime "github.com/j0j1j2/gogi/payload/runtime"
 )
 
@@ -463,7 +476,7 @@ var frontendFiles embed.FS
 
 func init() {
 	gogiruntime.SetFrontendAssets(frontendFiles, "frontend")
-	userbackend.Init(nil)
+	userbackend.Init(sdk.NewContext())
 }
 
 //export ModInit

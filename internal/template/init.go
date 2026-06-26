@@ -8,8 +8,8 @@ import (
 
 func InitProject(root string, name string) error {
 	files := map[string]string{
-		"go.mod":             goModTemplate(name),
-		"gogi.toml":          manifestTemplate(name),
+		"go.mod":              goModTemplate(name),
+		"gogi.toml":           manifestTemplate(name),
 		"frontend/index.html": frontendIndexTemplate(),
 		"frontend/style.css":  frontendStyleTemplate(),
 		"frontend/main.js":    frontendScriptTemplate(),
@@ -132,9 +132,19 @@ refresh();
 func backendMainTemplate() string {
 	return `package backend
 
-type Context interface{}
+import "github.com/j0j1j2/gogi/sdk"
 
-func Init(ctx Context) {
+func Init(ctx *sdk.Context) {
+	ctx.Logf("backend initialized")
+
+	// Register memory patches in Go so editor completion and type checking work.
+	// ctx.RegisterPatch(sdk.Patch{
+	// 	ID:      "example_patch",
+	// 	Library: "libtarget.so",
+	// 	RVA:     0x1234,
+	// 	Expect:  []byte{0x00},
+	// 	Replace: []byte{0x01},
+	// })
 }
 `
 }

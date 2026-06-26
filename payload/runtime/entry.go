@@ -9,6 +9,7 @@ import (
 	"github.com/j0j1j2/gogi/payload/control"
 	"github.com/j0j1j2/gogi/payload/mem"
 	"github.com/j0j1j2/gogi/payload/menu"
+	"github.com/j0j1j2/gogi/sdk"
 )
 
 var startOnce sync.Once
@@ -41,6 +42,16 @@ func startMenuServer() {
 	registry.SetApplier(mem.NewProcessApplier())
 	if spec, ok := demoPatchSpec(); ok {
 		registry.Register(spec)
+	}
+	for _, patch := range sdk.RegisteredPatches() {
+		registry.Register(mem.PatchSpec{
+			ID:      patch.ID,
+			Library: patch.Library,
+			RVA:     patch.RVA,
+			Expect:  patch.Expect,
+			Replace: patch.Replace,
+			Startup: patch.Startup,
+		})
 	}
 	server := menu.NewServer(registry)
 	if assets := menuAssets(); assets != nil {

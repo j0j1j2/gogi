@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -9,6 +10,10 @@ import (
 )
 
 func TestStartServesMenu(t *testing.T) {
+	if conn, err := net.DialTimeout("tcp", "127.0.0.1:17373", 50*time.Millisecond); err == nil {
+		_ = conn.Close()
+		t.Skip("menu port already in use")
+	}
 	Start(nil)
 
 	var body string

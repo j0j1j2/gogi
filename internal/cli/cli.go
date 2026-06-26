@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
+
+	"gogi/internal/project"
 )
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -19,8 +21,21 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "init command is unavailable until project templates are added")
 		return 1
 	case "validate":
-		fmt.Fprintln(stderr, "validate command is unavailable until manifest support is added")
-		return 1
+		path := "gogi.toml"
+		if len(args) > 1 {
+			path = args[1]
+		}
+		manifest, err := project.LoadManifest(path)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := manifest.Validate(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "%s is valid\n", path)
+		return 0
 	case "build":
 		fmt.Fprintln(stderr, "build command is unavailable until android build support is added")
 		return 1

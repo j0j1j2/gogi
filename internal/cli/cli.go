@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/j0j1j2/gogi/internal/apkbuild"
 	"github.com/j0j1j2/gogi/internal/buildenv"
 	"github.com/j0j1j2/gogi/internal/project"
 	gogitemplate "github.com/j0j1j2/gogi/internal/template"
@@ -18,6 +19,8 @@ import (
 type runCommandFunc func(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error
 
 var commandRunner runCommandFunc = runCommand
+var apkBuilder = apkbuild.BuildAPK
+var xapkBuilder = apkbuild.BuildXAPK
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -143,16 +146,28 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	case "build":
 		target := ""
+		targetKind := ""
 		out := ""
+		abi := "arm64-v8a"
+		api := 24
 		for i := 1; i < len(args); i++ {
 			switch args[i] {
-			case "--apk", "--xapk":
+			case "--apk":
 				i++
 				if i >= len(args) {
 					fmt.Fprintf(stderr, "%s requires a value\n", args[i-1])
 					return 2
 				}
 				target = args[i]
+				targetKind = "apk"
+			case "--xapk":
+				i++
+				if i >= len(args) {
+					fmt.Fprintf(stderr, "%s requires a value\n", args[i-1])
+					return 2
+				}
+				target = args[i]
+				targetKind = "xapk"
 			case "--out":
 				i++
 				if i >= len(args) {
@@ -160,6 +175,25 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 					return 2
 				}
 				out = args[i]
+			case "--abi":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--abi requires a value")
+					return 2
+				}
+				abi = args[i]
+			case "--api":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--api requires a value")
+					return 2
+				}
+				parsed, err := strconv.Atoi(args[i])
+				if err != nil {
+					fmt.Fprintf(stderr, "invalid --api %q\n", args[i])
+					return 2
+				}
+				api = parsed
 			default:
 				fmt.Fprintf(stderr, "unknown build flag %q\n", args[i])
 				return 2
@@ -173,8 +207,41 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "--out is required")
 			return 2
 		}
-		fmt.Fprintln(stderr, "APK/XAPK integration is not implemented yet")
-		return 1
+		compileArgs := []string{"compile", "--abi", abi, "--api", strconv.Itoa(api)}
+		if code := Run(compileArgs, stdout, stderr); code != 0 {
+			return code
+		}
+		libPath := filepath.Join("dist", abi, "libgogi.so")
+		switch targetKind {
+		case "apk":
+			if err := apkBuilder(apkbuild.APKOptions{
+				APKPath:     target,
+				OutPath:     out,
+				ABI:         abi,
+				LibraryPath: libPath,
+				Runner:      apkbuild.Runner(commandRunner),
+				Stdout:      stdout,
+				Stderr:      stderr,
+			}); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+		case "xapk":
+			if err := xapkBuilder(apkbuild.XAPKOptions{
+				XAPKPath:    target,
+				OutPath:     out,
+				ABI:         abi,
+				LibraryPath: libPath,
+				Runner:      apkbuild.Runner(commandRunner),
+				Stdout:      stdout,
+				Stderr:      stderr,
+			}); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+		}
+		fmt.Fprintf(stdout, "built %s\n", out)
+		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
 		printHelp(stderr)
@@ -207,11 +274,47 @@ func printHelp(w io.Writer) {
 }
 
 func runCommand(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error {
+	name = resolveExecutable(name)
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.Env = append(os.Environ(), envSlice(env)...)
 	return cmd.Run()
+}
+
+func resolveExecutable(name string) string {
+	if path, err := exec.LookPath(name); err == nil {
+		return path
+	}
+	if tool := findAndroidBuildTool(name); tool != "" {
+		return tool
+	}
+	return name
+}
+
+func findAndroidBuildTool(name string) string {
+	sdk := os.Getenv("ANDROID_HOME")
+	if sdk == "" {
+		sdk = os.Getenv("ANDROID_SDK_ROOT")
+	}
+	if sdk == "" {
+		return ""
+	}
+	root := filepath.Join(sdk, "build-tools")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return ""
+	}
+	for i := len(entries) - 1; i >= 0; i-- {
+		if !entries[i].IsDir() {
+			continue
+		}
+		candidate := filepath.Join(root, entries[i].Name(), name)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func envSlice(env map[string]string) []string {

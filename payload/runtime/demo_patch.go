@@ -7,16 +7,20 @@ import (
 	"github.com/j0j1j2/gogi/payload/mem"
 )
 
-var demoTargetValueRVAHex = "0x0"
+var demoTargetValueRVAHex = ""
 
-func demoPatchSpec() mem.PatchSpec {
+func demoPatchSpec() (mem.PatchSpec, bool) {
+	rva := parseDemoRVA()
+	if rva == 0 {
+		return mem.PatchSpec{}, false
+	}
 	return mem.PatchSpec{
 		ID:      "target_value_42",
 		Library: "libtarget.so",
-		RVA:     parseDemoRVA(),
+		RVA:     rva,
 		Expect:  []byte{0x07, 0x00, 0x00, 0x00},
 		Replace: []byte{0x2a, 0x00, 0x00, 0x00},
-	}
+	}, true
 }
 
 func parseDemoRVA() uintptr {

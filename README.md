@@ -36,3 +36,5 @@ Generated projects keep user code in `backend/` and UI assets in `frontend/`.
 During compile, `frontend/` is embedded into the payload and `backend.Init(nil)` is linked into the generated shared library.
 `gogi.toml` configures the build and overlay environment; memory patches and menu actions belong in backend Go code.
 The WebView menu frontend is HTML/CSS/JS served by the Go payload over a local HTTP API.
+
+`gogi build` decodes the target APK with `apktool`, injects `libgogi.so`, adds the Android overlay helper, inserts `System.loadLibrary("gogi")` into the app entry path, rebuilds, zipaligns, and signs the output with the Android debug keystore. XAPK input is supported by replacing the base APK inside the bundle.

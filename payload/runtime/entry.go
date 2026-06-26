@@ -39,7 +39,9 @@ func MenuURL() string {
 func startMenuServer() {
 	registry := control.NewRegistry()
 	registry.SetApplier(mem.NewProcessApplier())
-	registry.Register(demoPatchSpec())
+	if spec, ok := demoPatchSpec(); ok {
+		registry.Register(spec)
+	}
 	server := menu.NewServer(registry)
 	if assets := menuAssets(); assets != nil {
 		server = menu.NewServerWithAssets(registry, *assets)

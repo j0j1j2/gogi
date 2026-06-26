@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/j0j1j2/gogi/internal/apkbuild"
 )
 
 func TestCompileCommandRequiresNDK(t *testing.T) {
@@ -217,5 +219,132 @@ entry = "backend"
 	}
 	if !strings.Contains(joinedArgs, "github.com/j0j1j2/gogi/payload/runtime.overlayDraggable=true") {
 		t.Fatalf("ldflags missing overlay draggable: %q", joinedArgs)
+	}
+}
+
+func TestBuildCommandCompilesAndBuildsAPK(t *testing.T) {
+	dir := t.TempDir()
+	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android24-clang")
+	if err := os.MkdirAll(filepath.Dir(clang), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(clang, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "payload"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inputAPK := filepath.Join(dir, "input.apk")
+	outputAPK := filepath.Join(dir, "output.apk")
+	if err := os.WriteFile(inputAPK, []byte("apk"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
+	t.Setenv("ANDROID_NDK_ROOT", "")
+
+	var commands []string
+	oldRunner := commandRunner
+	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
+		commands = append(commands, name+" "+strings.Join(args, " "))
+		return nil
+	}
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	var gotOptions apkbuild.APKOptions
+	oldBuilder := apkBuilder
+	apkBuilder = func(opts apkbuild.APKOptions) error {
+		gotOptions = opts
+		return nil
+	}
+	t.Cleanup(func() { apkBuilder = oldBuilder })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"build", "--apk", inputAPK, "--out", outputAPK}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if len(commands) == 0 || !strings.Contains(commands[0], "go build") {
+		t.Fatalf("expected compile command first, commands=%v", commands)
+	}
+	if gotOptions.APKPath != inputAPK {
+		t.Fatalf("APKPath = %q", gotOptions.APKPath)
+	}
+	if gotOptions.OutPath != outputAPK {
+		t.Fatalf("OutPath = %q", gotOptions.OutPath)
+	}
+	if gotOptions.LibraryPath != filepath.Join("dist", "arm64-v8a", "libgogi.so") {
+		t.Fatalf("LibraryPath = %q", gotOptions.LibraryPath)
+	}
+	if !strings.Contains(out.String(), "built "+outputAPK) {
+		t.Fatalf("stdout = %q", out.String())
+	}
+}
+
+func TestBuildCommandCompilesAndBuildsXAPK(t *testing.T) {
+	dir := t.TempDir()
+	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android24-clang")
+	if err := os.MkdirAll(filepath.Dir(clang), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(clang, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "payload"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inputXAPK := filepath.Join(dir, "input.xapk")
+	outputXAPK := filepath.Join(dir, "output.xapk")
+	if err := os.WriteFile(inputXAPK, []byte("xapk"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
+	t.Setenv("ANDROID_NDK_ROOT", "")
+
+	oldRunner := commandRunner
+	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
+		return nil
+	}
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	var gotOptions apkbuild.XAPKOptions
+	oldBuilder := xapkBuilder
+	xapkBuilder = func(opts apkbuild.XAPKOptions) error {
+		gotOptions = opts
+		return nil
+	}
+	t.Cleanup(func() { xapkBuilder = oldBuilder })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"build", "--xapk", inputXAPK, "--out", outputXAPK}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if gotOptions.XAPKPath != inputXAPK {
+		t.Fatalf("XAPKPath = %q", gotOptions.XAPKPath)
+	}
+	if gotOptions.OutPath != outputXAPK {
+		t.Fatalf("OutPath = %q", gotOptions.OutPath)
 	}
 }

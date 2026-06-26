@@ -40,7 +40,7 @@ fi
 
 GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC="$CLANG" \
   go build \
-  -ldflags "-X gogi/payload/runtime.demoTargetValueRVAHex=$TARGET_RVA" \
+  -ldflags "-X github.com/j0j1j2/gogi/payload/runtime.demoTargetValueRVAHex=$TARGET_RVA" \
   -buildmode=c-shared \
   -o "$OUT/apk/lib/arm64-v8a/libgogi.so" "$ROOT/payload"
 

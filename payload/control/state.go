@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gogi/payload/mem"
+	"github.com/j0j1j2/gogi/payload/mem"
 )
 
 type Registry struct {

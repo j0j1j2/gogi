@@ -1,4 +1,4 @@
-module gogi
+module github.com/j0j1j2/gogi
 
 go 1.25
 

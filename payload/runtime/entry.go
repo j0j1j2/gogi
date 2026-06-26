@@ -6,9 +6,9 @@ import (
 	"time"
 	"unsafe"
 
-	"gogi/payload/control"
-	"gogi/payload/mem"
-	"gogi/payload/menu"
+	"github.com/j0j1j2/gogi/payload/control"
+	"github.com/j0j1j2/gogi/payload/mem"
+	"github.com/j0j1j2/gogi/payload/menu"
 )
 
 var startOnce sync.Once

@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"strconv"
 
-	"gogi/internal/buildenv"
-	"gogi/internal/project"
-	gogitemplate "gogi/internal/template"
+	"github.com/j0j1j2/gogi/internal/buildenv"
+	"github.com/j0j1j2/gogi/internal/project"
+	gogitemplate "github.com/j0j1j2/gogi/internal/template"
 )
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gogi/payload/control"
+	"github.com/j0j1j2/gogi/payload/control"
 )
 
 //go:embed assets/menu.html assets/menu.css assets/menu.js

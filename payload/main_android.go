@@ -10,7 +10,7 @@ import "C"
 import (
 	"unsafe"
 
-	gogiruntime "gogi/payload/runtime"
+	gogiruntime "github.com/j0j1j2/gogi/payload/runtime"
 )
 
 //export ModInit

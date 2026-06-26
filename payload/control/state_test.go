@@ -3,7 +3,7 @@ package control
 import (
 	"testing"
 
-	"gogi/payload/mem"
+	"github.com/j0j1j2/gogi/payload/mem"
 )
 
 func TestRegistryToggleState(t *testing.T) {

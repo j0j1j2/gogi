@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gogi/payload/mem"
+	"github.com/j0j1j2/gogi/payload/mem"
 )
 
 var demoTargetValueRVAHex = "0x0"

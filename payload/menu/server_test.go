@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"gogi/payload/control"
-	"gogi/payload/mem"
+	"github.com/j0j1j2/gogi/payload/control"
+	"github.com/j0j1j2/gogi/payload/mem"
 )
 
 func TestStateEndpoint(t *testing.T) {

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"gogi/internal/cli"
+	"github.com/j0j1j2/gogi/internal/cli"
 )
 
 func main() {

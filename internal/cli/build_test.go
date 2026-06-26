@@ -44,6 +44,9 @@ func TestCompileCommandRunsGoBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	if err := os.Mkdir("payload", 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
 	t.Setenv("ANDROID_NDK_ROOT", "")
@@ -82,5 +85,107 @@ func TestCompileCommandRunsGoBuild(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "built dist/arm64-v8a/libgogi.so") {
 		t.Fatalf("stdout = %q", out.String())
+	}
+}
+
+func TestCompileCommandUsesModulePayloadOutsideRepo(t *testing.T) {
+	dir := t.TempDir()
+	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android24-clang")
+	if err := os.MkdirAll(filepath.Dir(clang), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(clang, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
+	t.Setenv("ANDROID_NDK_ROOT", "")
+
+	var gotArgs []string
+	oldRunner := commandRunner
+	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
+		gotArgs = append([]string(nil), args...)
+		return nil
+	}
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"compile"}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if gotArgs[len(gotArgs)-1] != "github.com/j0j1j2/gogi/payload" {
+		t.Fatalf("payload package = %q", gotArgs[len(gotArgs)-1])
+	}
+}
+
+func TestCompileCommandUsesManifestBuildDefaults(t *testing.T) {
+	dir := t.TempDir()
+	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android26-clang")
+	if err := os.MkdirAll(filepath.Dir(clang), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(clang, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := `name = "sample"
+
+[build]
+package = "com.example.target"
+abis = ["arm64-v8a"]
+min_sdk = 26
+
+[overlay]
+enabled = true
+mode = "webview"
+
+[frontend]
+entry = "frontend/index.html"
+
+[backend]
+entry = "backend"
+`
+	if err := os.WriteFile(filepath.Join(dir, "gogi.toml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
+	t.Setenv("ANDROID_NDK_ROOT", "")
+
+	var gotEnv map[string]string
+	oldRunner := commandRunner
+	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
+		gotEnv = env
+		return nil
+	}
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"compile"}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if gotEnv["CC"] != clang {
+		t.Fatalf("CC = %q, want %q", gotEnv["CC"], clang)
 	}
 }

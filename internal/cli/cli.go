@@ -58,6 +58,17 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "compile":
 		abi := "arm64-v8a"
 		api := 24
+		if manifest, ok, err := loadManifestIfPresent("gogi.toml"); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		} else if ok {
+			if len(manifest.Build.ABIs) > 0 {
+				abi = manifest.Build.ABIs[0]
+			}
+			if manifest.Build.MinSDK > 0 {
+				api = manifest.Build.MinSDK
+			}
+		}
 		for i := 1; i < len(args); i++ {
 			switch args[i] {
 			case "--abi":
@@ -106,7 +117,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			"CGO_ENABLED": "1",
 			"CC":          cfg.CC,
 		}
-		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, "./payload"}
+		buildArgs := []string{"build", "-buildmode=c-shared", "-o", outPath, payloadPackage()}
 		if err := commandRunner("go", buildArgs, buildEnv, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
@@ -192,4 +203,28 @@ func envSlice(env map[string]string) []string {
 		items = append(items, key+"="+value)
 	}
 	return items
+}
+
+func payloadPackage() string {
+	if info, err := os.Stat("payload"); err == nil && info.IsDir() {
+		return "./payload"
+	}
+	return "github.com/j0j1j2/gogi/payload"
+}
+
+func loadManifestIfPresent(path string) (*project.Manifest, bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	manifest, err := project.LoadManifest(path)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := manifest.Validate(); err != nil {
+		return nil, false, err
+	}
+	return manifest, true, nil
 }

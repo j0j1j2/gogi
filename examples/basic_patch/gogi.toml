@@ -1,0 +1,20 @@
+name = "basic_patch"
+package = "com.example.target"
+abis = ["arm64-v8a"]
+api = 24
+entry = ["jni_onload", "modinit"]
+menu_backend = "webview"
+
+[[patches]]
+id = "sample_patch"
+library = "libtarget.so"
+rva = "0x0"
+expect = "00"
+replace = "00"
+startup = false
+
+[[menu.toggles]]
+id = "sample_patch"
+label = "Sample Patch"
+patch = "sample_patch"
+initial = false

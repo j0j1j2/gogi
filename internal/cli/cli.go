@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"gogi/internal/project"
+	gogitemplate "gogi/internal/template"
 )
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -18,8 +19,16 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		printHelp(stdout)
 		return 0
 	case "init":
-		fmt.Fprintln(stderr, "init command is unavailable until project templates are added")
-		return 1
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: gogi init <name>")
+			return 2
+		}
+		if err := gogitemplate.InitProject(args[1], args[1]); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "created %s\n", args[1])
+		return 0
 	case "validate":
 		path := "gogi.toml"
 		if len(args) > 1 {

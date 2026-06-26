@@ -35,8 +35,10 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 Check the CLI:
 
 ```bash
-gogi help
+gogi version
 ```
+
+`gogi version` prints the installed module version and commit, which is the easiest way to confirm `go install ...@latest` picked up an update.
 
 ## Quick Start
 

@@ -23,6 +23,26 @@ func TestRunHelp(t *testing.T) {
 	if !bytes.Contains(out.Bytes(), []byte("gogi compile")) {
 		t.Fatalf("help output missing compile usage: %q", out.String())
 	}
+	if !bytes.Contains(out.Bytes(), []byte("gogi version")) {
+		t.Fatalf("help output missing version usage: %q", out.String())
+	}
+}
+
+func TestRunVersion(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := Run([]string{"version"}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if !bytes.Contains(out.Bytes(), []byte("gogi ")) {
+		t.Fatalf("version output missing gogi version: %q", out.String())
+	}
+	if !bytes.Contains(out.Bytes(), []byte("commit ")) {
+		t.Fatalf("version output missing commit: %q", out.String())
+	}
 }
 
 func TestRunUnknownCommand(t *testing.T) {

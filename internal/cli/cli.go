@@ -14,6 +14,7 @@ import (
 	"github.com/j0j1j2/gogi/internal/buildenv"
 	"github.com/j0j1j2/gogi/internal/project"
 	gogitemplate "github.com/j0j1j2/gogi/internal/template"
+	"github.com/j0j1j2/gogi/internal/version"
 )
 
 type runCommandFunc func(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error
@@ -32,6 +33,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	switch args[0] {
 	case "help", "-h", "--help":
 		printHelp(stdout)
+		return 0
+	case "version", "-v", "--version":
+		fmt.Fprint(stdout, version.Current().String())
 		return 0
 	case "init":
 		if len(args) != 2 {
@@ -275,6 +279,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  gogi validate [manifest]")
 	fmt.Fprintln(w, "  gogi compile [--abi arm64-v8a] [--api 24]")
 	fmt.Fprintln(w, "  gogi build --apk <path>|--xapk <path> --out <path>")
+	fmt.Fprintln(w, "  gogi version")
 }
 
 func runCommand(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error {

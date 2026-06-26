@@ -11,6 +11,7 @@ type AppliedPatch struct {
 	Offset   int
 	Original []byte
 	Length   int
+	Perms    string
 }
 
 func ApplyToSlice(buf []byte, offset int, spec PatchSpec) (AppliedPatch, error) {

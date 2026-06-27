@@ -242,7 +242,11 @@ func (h *handler) serveLogs(w http.ResponseWriter) {
 	defer h.mu.Unlock()
 	events := make([]devEvent, len(h.events))
 	copy(events, h.events)
-	writeJSON(w, map[string]any{"events": events})
+	patches := make(map[string]patchState, len(h.patches))
+	for id, patch := range h.patches {
+		patches[id] = patch
+	}
+	writeJSON(w, map[string]any{"events": events, "patches": patches})
 }
 
 func (h *handler) serveClientScript(w http.ResponseWriter) {
@@ -334,6 +338,99 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       box-shadow: 0 18px 50px rgba(0,0,0,0.28);
       overflow: hidden;
     }
+    .gogi-live-status {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #151916;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .gogi-live-label {
+      color: #8f9b93;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .gogi-live-value {
+      color: #eef5f0;
+      font-size: 13px;
+      line-height: 1.35;
+      min-height: 18px;
+      overflow-wrap: anywhere;
+    }
+    .gogi-live-status.is-hot {
+      border-color: rgba(104, 202, 170, 0.75);
+      box-shadow: 0 0 0 3px rgba(104, 202, 170, 0.13);
+    }
+    .gogi-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 5;
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      max-width: min(520px, calc(100vw - 32px));
+      padding: 11px 14px;
+      border-radius: 999px;
+      background: #e8f5ee;
+      color: #14201a;
+      box-shadow: 0 18px 55px rgba(0,0,0,0.34);
+      font-size: 13px;
+      font-weight: 700;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+    .gogi-toast.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    .gogi-memory-card {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #151916;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .gogi-memory-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #eef5f0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .gogi-memory-list {
+      display: grid;
+      gap: 7px;
+    }
+    .gogi-memory-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      color: #c8d2cc;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .gogi-memory-badge {
+      flex: 0 0 auto;
+      min-width: 44px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      text-align: center;
+      background: #333b35;
+      color: #aeb8b2;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .gogi-memory-badge.is-on {
+      background: #2f7d68;
+      color: #f2fff9;
+    }
     .gogi-log-head {
       display: flex;
       justify-content: space-between;
@@ -373,6 +470,10 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       background: #151916;
       border: 1px solid rgba(255,255,255,0.07);
     }
+    .gogi-log-item.is-new {
+      border-color: rgba(104, 202, 170, 0.75);
+      box-shadow: 0 0 0 3px rgba(104, 202, 170, 0.11);
+    }
     .gogi-log-line {
       display: flex;
       justify-content: space-between;
@@ -411,6 +512,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
     @media (max-width: 460px) {
       body { padding: 0; background: #101312; }
       .gogi-toolbar, .gogi-log-panel { display: none; }
+      .gogi-toast { display: none; }
       .gogi-stage, .gogi-phone {
         width: 100vw;
         height: 100vh;
@@ -440,15 +542,36 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
           <strong>Runtime activity</strong>
           <span id="gogi-log-count">0 events</span>
         </div>
+        <div class="gogi-live-status" id="gogi-live-status">
+          <span class="gogi-live-label">Latest event</span>
+          <span class="gogi-live-value" id="gogi-live-value">No mock events yet</span>
+        </div>
+        <section class="gogi-memory-card" aria-label="Mock memory state">
+          <div class="gogi-memory-head">
+            <span>Mock memory</span>
+            <span id="gogi-memory-count">0 patches</span>
+          </div>
+          <div class="gogi-memory-list" id="gogi-memory-list">
+            <div class="gogi-log-empty">No mock memory edits yet.</div>
+          </div>
+        </section>
         <ul class="gogi-log-list" id="gogi-log-list">
           <li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>
         </ul>
       </aside>
     </div>
   </main>
+  <div class="gogi-toast" id="gogi-toast" role="status" aria-live="polite"></div>
   <script>
     const list = document.getElementById("gogi-log-list");
     const count = document.getElementById("gogi-log-count");
+    const toast = document.getElementById("gogi-toast");
+    const liveStatus = document.getElementById("gogi-live-status");
+    const liveValue = document.getElementById("gogi-live-value");
+    const memoryList = document.getElementById("gogi-memory-list");
+    const memoryCount = document.getElementById("gogi-memory-count");
+    let seenLatestEventID = 0;
+    let toastTimer = 0;
     function escapeText(value) {
       return String(value == null ? "" : value).replace(/[&<>"']/g, character => ({
         "&": "&amp;",
@@ -463,14 +586,19 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
         const response = await fetch("/gogi-dev/logs", {cache: "no-store"});
         const state = await response.json();
         const events = state.events || [];
+        const patches = state.patches || {};
+        const latest = events[events.length - 1];
         count.textContent = events.length + (events.length === 1 ? " event" : " events");
+        renderMemory(patches);
+        if (latest) renderLatest(latest);
         if (events.length === 0) {
           list.innerHTML = '<li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>';
           return;
         }
         list.innerHTML = events.slice().reverse().map(event => {
           const detail = event.detail ? '<div class="gogi-log-detail">' + escapeText(event.detail) + '</div>' : "";
-          return '<li class="gogi-log-item">' +
+          const newest = latest && event.id === latest.id ? " is-new" : "";
+          return '<li class="gogi-log-item' + newest + '">' +
             '<div class="gogi-log-line">' +
             '<span>' + escapeText(event.title || event.kind) + '</span>' +
             '<span class="gogi-log-time">' + escapeText(event.time) + '</span>' +
@@ -481,7 +609,39 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
         }).join("");
       } catch (_) {}
     }
-    setInterval(refreshLogs, 650);
+    function renderLatest(event) {
+      const text = (event.title || event.kind) + ": " + event.message;
+      liveValue.textContent = text;
+      if (event.id > seenLatestEventID) {
+        seenLatestEventID = event.id;
+        liveStatus.classList.remove("is-hot");
+        void liveStatus.offsetWidth;
+        liveStatus.classList.add("is-hot");
+        showToast(text);
+      }
+    }
+    function renderMemory(patches) {
+      const entries = Object.entries(patches);
+      memoryCount.textContent = entries.length + (entries.length === 1 ? " patch" : " patches");
+      if (entries.length === 0) {
+        memoryList.innerHTML = '<div class="gogi-log-empty">No mock memory edits yet.</div>';
+        return;
+      }
+      memoryList.innerHTML = entries.map(([id, record]) => {
+        const enabled = Boolean(record.Enabled);
+        return '<div class="gogi-memory-row">' +
+          '<span>' + escapeText(id) + '</span>' +
+          '<span class="gogi-memory-badge' + (enabled ? " is-on" : "") + '">' + (enabled ? "ON" : "OFF") + '</span>' +
+          '</div>';
+      }).join("");
+    }
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("is-visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 1800);
+    }
+    setInterval(refreshLogs, 250);
     refreshLogs();
   </script>
 </body>

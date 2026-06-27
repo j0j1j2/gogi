@@ -26,6 +26,9 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	if !strings.Contains(html, `class="gogi-log-panel"`) || !strings.Contains(html, `/gogi-dev/logs`) {
 		t.Fatalf("root response missing activity log panel: %s", html)
 	}
+	if !strings.Contains(html, `id="gogi-toast"`) || !strings.Contains(html, `id="gogi-memory-list"`) {
+		t.Fatalf("root response missing visible event and memory indicators: %s", html)
+	}
 
 	app := getBody(t, handler, "/gogi-dev/app/")
 	if !strings.Contains(app, "<main>menu</main>") {
@@ -72,6 +75,9 @@ func TestHandlerTogglesMockPatch(t *testing.T) {
 	logs := getBody(t, handler, "/gogi-dev/logs")
 	if !strings.Contains(logs, "mock memory") || !strings.Contains(logs, "example") {
 		t.Fatalf("logs missing mock memory toggle event: %s", logs)
+	}
+	if !strings.Contains(logs, `"patches"`) || !strings.Contains(logs, `"Enabled":true`) {
+		t.Fatalf("logs missing mock memory state: %s", logs)
 	}
 }
 

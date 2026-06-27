@@ -157,7 +157,7 @@ Default URL:
 http://127.0.0.1:17374
 ```
 
-The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work. The preview shell also shows a runtime activity panel, so mock actions and mock memory patch toggles are visible while you interact with the menu.
+The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work. The preview shell also shows a runtime activity panel with a latest-event indicator, toast notifications, an event list, and mock memory patch state, so mock actions and memory patch toggles are visible while you interact with the menu.
 
 If the requested port is already in use, `gogi dev` tries the next ports and prints the actual URL it selected:
 

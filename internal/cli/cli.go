@@ -78,6 +78,10 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
+		if !ok {
+			fmt.Fprintln(stderr, "gogi.toml not found; run gogi dev inside a gogi project")
+			return 1
+		}
 		if ok && manifest.Frontend.Entry != "" {
 			frontendDir = filepath.Dir(manifest.Frontend.Entry)
 			if frontendDir == "." {

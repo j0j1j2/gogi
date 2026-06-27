@@ -144,9 +144,10 @@ You can replace `frontend/index.html`, `frontend/style.css`, and `frontend/main.
 
 ### Frontend Dev Server
 
-Run a local preview server while editing `frontend/`:
+Run a local preview server from a gogi project directory while editing `frontend/`:
 
 ```bash
+cd mymod
 gogi dev
 ```
 
@@ -156,7 +157,7 @@ Default URL:
 http://127.0.0.1:17374
 ```
 
-The dev server serves your HTML/CSS/JS, injects a small live-reload script into HTML responses, and provides a mock API for local UI work.
+The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work.
 
 If the requested port is already in use, `gogi dev` tries the next ports and prints the actual URL it selected:
 

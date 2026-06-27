@@ -20,14 +20,19 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	handler := NewHandler(Options{FrontendDir: dir})
 
 	html := getBody(t, handler, "/")
-	if !strings.Contains(html, "<main>menu</main>") {
-		t.Fatalf("index response missing frontend html: %s", html)
-	}
-	if !strings.Contains(html, `/gogi-dev/reload.js`) {
-		t.Fatalf("index response missing reload script: %s", html)
+	if !strings.Contains(html, `class="gogi-phone"`) || !strings.Contains(html, `src="/gogi-dev/app/"`) {
+		t.Fatalf("root response missing phone preview shell: %s", html)
 	}
 
-	css := getBody(t, handler, "/style.css")
+	app := getBody(t, handler, "/gogi-dev/app/")
+	if !strings.Contains(app, "<main>menu</main>") {
+		t.Fatalf("app response missing frontend html: %s", app)
+	}
+	if !strings.Contains(app, `/gogi-dev/reload.js`) {
+		t.Fatalf("app response missing reload script: %s", app)
+	}
+
+	css := getBody(t, handler, "/gogi-dev/app/style.css")
 	if !strings.Contains(css, "color: red") {
 		t.Fatalf("css response = %q", css)
 	}

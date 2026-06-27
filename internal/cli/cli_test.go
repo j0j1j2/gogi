@@ -167,3 +167,37 @@ entry = "backend"
 		t.Fatalf("frontend dir = %q", got.FrontendDir)
 	}
 }
+
+func TestRunDevRequiresGogiProject(t *testing.T) {
+	dir := t.TempDir()
+	oldCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldCwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	oldDevServer := devServer
+	devServer = func(opts devserver.Options) error {
+		t.Fatal("dev server should not start outside a gogi project")
+		return nil
+	}
+	t.Cleanup(func() { devServer = oldDevServer })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"dev"}, &out, &errOut)
+
+	if code != 1 {
+		t.Fatalf("expected code 1, got %d", code)
+	}
+	if !bytes.Contains(errOut.Bytes(), []byte("gogi.toml not found")) {
+		t.Fatalf("stderr missing project error: %q", errOut.String())
+	}
+}

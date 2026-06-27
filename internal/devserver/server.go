@@ -124,7 +124,15 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/favicon.ico":
 		w.WriteHeader(http.StatusNoContent)
 	default:
-		h.serveFrontend(w, r)
+		if r.URL.Path == "/" {
+			h.servePreviewShell(w)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/gogi-dev/app/") {
+			h.serveFrontend(w, r, "/gogi-dev/app/")
+			return
+		}
+		http.NotFound(w, r)
 	}
 }
 
@@ -193,6 +201,105 @@ func (h *handler) serveClientScript(w http.ResponseWriter) {
 	_, _ = io.WriteString(w, webclient.Script)
 }
 
+func (h *handler) servePreviewShell(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = io.WriteString(w, `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gogi dev</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #171918;
+      color: #edf2ef;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.05), transparent 32%),
+        #171918;
+    }
+    .gogi-stage {
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+    }
+    .gogi-toolbar {
+      width: min(390px, calc(100vw - 32px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #aeb8b2;
+      font-size: 12px;
+    }
+    .gogi-phone {
+      width: min(390px, calc(100vw - 32px));
+      aspect-ratio: 390 / 844;
+      max-height: calc(100vh - 86px);
+      border: 10px solid #0a0d0c;
+      border-radius: 34px;
+      background: #101312;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08);
+      position: relative;
+    }
+    .gogi-phone::before {
+      content: "";
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      width: 92px;
+      height: 20px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #090b0a;
+      z-index: 2;
+    }
+    .gogi-screen {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #101312;
+    }
+    @media (max-width: 460px) {
+      body { padding: 0; background: #101312; }
+      .gogi-toolbar { display: none; }
+      .gogi-stage, .gogi-phone {
+        width: 100vw;
+        height: 100vh;
+        max-height: none;
+      }
+      .gogi-phone {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .gogi-phone::before { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="gogi-stage">
+    <div class="gogi-toolbar">
+      <strong>gogi dev</strong>
+      <span>390 x 844 preview</span>
+    </div>
+    <section class="gogi-phone" aria-label="Phone preview">
+      <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
+    </section>
+  </main>
+</body>
+</html>
+`)
+}
+
 func (h *handler) serveReloadJS(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	_, _ = io.WriteString(w, `(function(){
@@ -231,8 +338,12 @@ func (h *handler) frontendVersion() string {
 	return fmt.Sprintf("%x", hash.Sum64())
 }
 
-func (h *handler) serveFrontend(w http.ResponseWriter, r *http.Request) {
-	assetPath := strings.TrimPrefix(urlpath.Clean("/"+r.URL.Path), "/")
+func (h *handler) serveFrontend(w http.ResponseWriter, r *http.Request, prefix string) {
+	requestPath := r.URL.Path
+	if prefix != "" {
+		requestPath = "/" + strings.TrimPrefix(r.URL.Path, prefix)
+	}
+	assetPath := strings.TrimPrefix(urlpath.Clean("/"+requestPath), "/")
 	if assetPath == "." || assetPath == "" {
 		assetPath = "index.html"
 	}

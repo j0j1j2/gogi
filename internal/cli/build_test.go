@@ -348,3 +348,18 @@ func TestBuildCommandCompilesAndBuildsXAPK(t *testing.T) {
 		t.Fatalf("OutPath = %q", gotOptions.OutPath)
 	}
 }
+
+func TestGeneratedPayloadWiresSDKContext(t *testing.T) {
+	source := generatedPayloadSource("example.com/mod", "backend")
+
+	for _, want := range []string{
+		`"github.com/j0j1j2/gogi/sdk"`,
+		"ctx := sdk.NewContext()",
+		"ctx.Logf = gogiruntime.Logf",
+		"userbackend.Init(ctx)",
+	} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("generated source missing %q:\n%s", want, source)
+		}
+	}
+}

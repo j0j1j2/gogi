@@ -79,7 +79,7 @@ mymod/
     main.go
 ```
 
-`gogi compile` generates an internal `.gogi/build` package, embeds `frontend/`, links `backend.Init(nil)`, and builds an Android `c-shared` library.
+`gogi compile` generates an internal `.gogi/build` package, embeds `frontend/`, calls `backend.Init(ctx)` with a typed `*sdk.Context`, and builds an Android `c-shared` library.
 
 ## Configuration
 
@@ -161,6 +161,74 @@ func Init(ctx *sdk.Context) {
 ```
 
 `Init` is called when the generated payload starts. `ctx.RegisterPatch` adds a typed memory patch to the runtime registry, so it appears in `/api/state` and the generated WebView menu.
+
+### SDK API
+
+`sdk.Context` is the object passed to `backend.Init`.
+
+```go
+type Context struct {
+    Menu   *Menu
+    Memory *Memory
+    Logf   func(format string, args ...any)
+}
+```
+
+Currently supported runtime-connected API:
+
+```go
+func (ctx *sdk.Context) RegisterPatch(patch sdk.Patch)
+```
+
+Registers a memory patch in the runtime registry:
+
+```go
+ctx.RegisterPatch(sdk.Patch{
+    ID:      "unlock_feature",
+    Library: "libtarget.so",
+    RVA:     0x1234,
+    Expect:  []byte{0x00},
+    Replace: []byte{0x01},
+    Startup: false,
+})
+```
+
+`sdk.Patch` fields:
+
+```go
+type Patch struct {
+    ID      string
+    Library string
+    RVA     uintptr
+    Expect  []byte
+    Replace []byte
+    Startup bool
+}
+```
+
+- `ID`: unique patch ID shown through `/api/state`
+- `Library`: target module name, for example `libtarget.so`
+- `RVA`: relative virtual address inside the target module
+- `Expect`: optional bytes that must match before patching
+- `Replace`: bytes written when the patch is enabled
+- `Startup`: reserved for startup patch behavior
+
+Logging:
+
+```go
+ctx.Logf("loaded backend for %s", "mymod")
+```
+
+`ctx.Logf` is wired to the payload logger. On Android it writes through logcat with the `gogi` tag.
+
+Reserved extension points:
+
+```go
+ctx.Menu
+ctx.Memory
+```
+
+These exist so editors can discover the intended SDK shape, but the stable runtime-connected API today is `ctx.RegisterPatch` plus `ctx.Logf`. Prefer `ctx.RegisterPatch` for memory edits until the higher-level menu and memory helpers are promoted.
 
 ## Build Integration
 

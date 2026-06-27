@@ -481,7 +481,9 @@ var frontendFiles embed.FS
 
 func init() {
 	gogiruntime.SetFrontendAssets(frontendFiles, "frontend")
-	userbackend.Init(sdk.NewContext())
+	ctx := sdk.NewContext()
+	ctx.Logf = gogiruntime.Logf
+	userbackend.Init(ctx)
 }
 
 //export ModInit

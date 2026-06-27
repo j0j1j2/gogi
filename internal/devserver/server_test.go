@@ -26,6 +26,9 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	if !strings.Contains(html, `class="gogi-debug-panel gogi-log-panel"`) || !strings.Contains(html, `Debug panel`) || !strings.Contains(html, `/gogi-dev/logs`) {
 		t.Fatalf("root response missing debug panel view: %s", html)
 	}
+	if !strings.Contains(html, `--gogi-preview-height`) || !strings.Contains(html, `height: var(--gogi-preview-height)`) {
+		t.Fatalf("root response missing matched preview/debug heights: %s", html)
+	}
 	if !strings.Contains(html, `id="gogi-toast"`) || !strings.Contains(html, `id="gogi-memory-list"`) {
 		t.Fatalf("root response missing visible event and memory indicators: %s", html)
 	}

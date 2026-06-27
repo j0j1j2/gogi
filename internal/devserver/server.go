@@ -266,6 +266,8 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
     :root {
       color-scheme: dark;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --gogi-preview-width: min(390px, calc(100vw - 32px));
+      --gogi-preview-height: min(844px, calc(100vh - 86px));
       background: #171918;
       color: #edf2ef;
     }
@@ -291,7 +293,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       align-items: start;
     }
     .gogi-toolbar {
-      width: min(390px, calc(100vw - 32px));
+      width: var(--gogi-preview-width);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -299,9 +301,8 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       font-size: 12px;
     }
     .gogi-phone {
-      width: min(390px, calc(100vw - 32px));
-      aspect-ratio: 390 / 844;
-      max-height: calc(100vh - 86px);
+      width: var(--gogi-preview-width);
+      height: var(--gogi-preview-height);
       border: 10px solid #0a0d0c;
       border-radius: 34px;
       background: #101312;
@@ -329,14 +330,15 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
     }
     .gogi-log-panel {
       width: min(360px, calc(100vw - 32px));
-      max-height: calc(100vh - 86px);
-      min-height: 460px;
+      height: var(--gogi-preview-height);
       padding: 16px;
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 18px;
       background: #202420;
       box-shadow: 0 18px 50px rgba(0,0,0,0.28);
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .gogi-live-status {
       display: grid;
@@ -450,7 +452,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
     .gogi-log-list {
       display: grid;
       gap: 10px;
-      max-height: calc(100vh - 160px);
+      min-height: 0;
       margin: 0;
       padding: 14px 0 2px;
       overflow: auto;
@@ -506,7 +508,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
         justify-items: center;
       }
       .gogi-log-panel {
-        min-height: 220px;
+        height: min(420px, calc(100vh - 72px));
       }
     }
     @media (max-width: 460px) {

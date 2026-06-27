@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"encoding/json"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -76,5 +77,47 @@ func TestToggleEndpoint(t *testing.T) {
 	}
 	if !reg.Snapshot().Patches["god_mode"].Enabled {
 		t.Fatal("expected patch enabled")
+	}
+}
+
+func TestActionEndpoint(t *testing.T) {
+	reg := control.NewRegistry()
+	reg.RegisterAction(control.ActionSpec{
+		ID: "give_coins",
+		Handler: func(req control.ActionRequest) (any, error) {
+			var payload map[string]int
+			if err := json.Unmarshal(req.Payload, &payload); err != nil {
+				return nil, err
+			}
+			return map[string]int{"amount": payload["amount"]}, nil
+		},
+	})
+	server := NewServer(reg)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/action/give_coins", strings.NewReader(`{"amount":10}`))
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"amount":10`) {
+		t.Fatalf("body missing action result: %s", rec.Body.String())
+	}
+}
+
+func TestClientScriptEndpoint(t *testing.T) {
+	reg := control.NewRegistry()
+	server := NewServer(reg)
+
+	req := httptest.NewRequest(http.MethodGet, "/gogi.js", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "window.gogi") {
+		t.Fatalf("client script missing window.gogi: %s", rec.Body.String())
 	}
 }

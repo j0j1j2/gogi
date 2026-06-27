@@ -53,6 +53,15 @@ func startMenuServer() {
 			Startup: patch.Startup,
 		})
 	}
+	for _, action := range sdk.RegisteredActions() {
+		action := action
+		registry.RegisterAction(control.ActionSpec{
+			ID: action.ID,
+			Handler: func(req control.ActionRequest) (any, error) {
+				return action.Handler(sdk.ActionRequest{ID: req.ID, Payload: req.Payload})
+			},
+		})
+	}
 	server := menu.NewServer(registry)
 	if assets := menuAssets(); assets != nil {
 		server = menu.NewServerWithAssets(registry, *assets)

@@ -34,4 +34,7 @@ func ResetForTest() {
 	patchState.Lock()
 	defer patchState.Unlock()
 	patchState.items = nil
+	actionState.Lock()
+	defer actionState.Unlock()
+	actionState.items = nil
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/j0j1j2/gogi/internal/apkbuild"
 	"github.com/j0j1j2/gogi/internal/buildenv"
+	"github.com/j0j1j2/gogi/internal/devserver"
 	"github.com/j0j1j2/gogi/internal/project"
 	gogitemplate "github.com/j0j1j2/gogi/internal/template"
 	"github.com/j0j1j2/gogi/internal/version"
@@ -23,6 +24,7 @@ var commandRunner runCommandFunc = runCommand
 var apkBuilder = apkbuild.BuildAPK
 var xapkBuilder = apkbuild.BuildXAPK
 var dependencyResolver = resolveProjectDependencies
+var devServer = devserver.Serve
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -66,6 +68,59 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 1
 		}
 		fmt.Fprintf(stdout, "%s is valid\n", path)
+		return 0
+	case "dev":
+		addr := "127.0.0.1:17374"
+		proxy := ""
+		frontendDir := "frontend"
+		manifest, ok, err := loadManifestIfPresent("gogi.toml")
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if ok && manifest.Frontend.Entry != "" {
+			frontendDir = filepath.Dir(manifest.Frontend.Entry)
+			if frontendDir == "." {
+				frontendDir = "frontend"
+			}
+		}
+		for i := 1; i < len(args); i++ {
+			switch args[i] {
+			case "--addr":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--addr requires a value")
+					return 2
+				}
+				addr = args[i]
+			case "--proxy":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--proxy requires a value")
+					return 2
+				}
+				proxy = args[i]
+			case "--frontend":
+				i++
+				if i >= len(args) {
+					fmt.Fprintln(stderr, "--frontend requires a value")
+					return 2
+				}
+				frontendDir = args[i]
+			default:
+				fmt.Fprintf(stderr, "unknown dev flag %q\n", args[i])
+				return 2
+			}
+		}
+		if err := devServer(devserver.Options{
+			FrontendDir: frontendDir,
+			Addr:        addr,
+			Proxy:       proxy,
+			Stdout:      stdout,
+		}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
 		return 0
 	case "compile":
 		abi := "arm64-v8a"
@@ -279,6 +334,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  gogi validate [manifest]")
 	fmt.Fprintln(w, "  gogi compile [--abi arm64-v8a] [--api 24]")
 	fmt.Fprintln(w, "  gogi build --apk <path>|--xapk <path> --out <path>")
+	fmt.Fprintln(w, "  gogi dev [--addr 127.0.0.1:17374] [--proxy http://host:port] [--frontend dir]")
 	fmt.Fprintln(w, "  gogi version")
 }
 

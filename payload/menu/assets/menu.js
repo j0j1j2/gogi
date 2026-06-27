@@ -1,6 +1,5 @@
 async function refresh() {
-  const response = await fetch('/api/state');
-  const state = await response.json();
+  const state = await gogi.state();
   document.getElementById('status').textContent = 'ready';
   const root = document.getElementById('toggles');
   root.innerHTML = '';
@@ -11,7 +10,7 @@ async function refresh() {
     button.setAttribute('aria-pressed', record.Enabled ? 'true' : 'false');
     button.addEventListener('click', async () => {
       const next = !record.Enabled;
-      await fetch(`/api/toggle/${encodeURIComponent(id)}?enabled=${next}`, { method: 'POST' });
+      await gogi.toggle(id, next);
       await refresh();
     });
     root.appendChild(button);

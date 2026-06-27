@@ -1,6 +1,7 @@
 package control
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/j0j1j2/gogi/payload/mem"
@@ -45,6 +46,34 @@ func TestRegistryToggleCallsApplier(t *testing.T) {
 	}
 	if applier.restoredID != "god_mode" {
 		t.Fatalf("restoredID = %q", applier.restoredID)
+	}
+}
+
+func TestRegistryDispatchesAction(t *testing.T) {
+	reg := NewRegistry()
+	reg.RegisterAction(ActionSpec{
+		ID: "give_coins",
+		Handler: func(req ActionRequest) (any, error) {
+			return map[string]any{"payload": string(req.Payload)}, nil
+		},
+	})
+
+	result, err := reg.DispatchAction("give_coins", json.RawMessage(`{"amount":10}`))
+	if err != nil {
+		t.Fatalf("DispatchAction returned error: %v", err)
+	}
+	if result.(map[string]any)["payload"] != `{"amount":10}` {
+		t.Fatalf("result = %#v", result)
+	}
+	if _, ok := reg.Snapshot().Actions["give_coins"]; !ok {
+		t.Fatalf("state missing registered action: %#v", reg.Snapshot())
+	}
+}
+
+func TestRegistryRejectsUnknownAction(t *testing.T) {
+	reg := NewRegistry()
+	if _, err := reg.DispatchAction("missing", nil); err == nil {
+		t.Fatal("expected unknown action error")
 	}
 }
 

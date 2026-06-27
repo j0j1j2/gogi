@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/j0j1j2/gogi/internal/devserver"
 )
 
 func TestRunHelp(t *testing.T) {
@@ -22,6 +24,9 @@ func TestRunHelp(t *testing.T) {
 	}
 	if !bytes.Contains(out.Bytes(), []byte("gogi compile")) {
 		t.Fatalf("help output missing compile usage: %q", out.String())
+	}
+	if !bytes.Contains(out.Bytes(), []byte("gogi dev")) {
+		t.Fatalf("help output missing dev usage: %q", out.String())
 	}
 	if !bytes.Contains(out.Bytes(), []byte("gogi version")) {
 		t.Fatalf("help output missing version usage: %q", out.String())
@@ -100,5 +105,65 @@ func TestRunInitResolvesSDKDependency(t *testing.T) {
 	}
 	if !bytes.Contains(backend, []byte("github.com/j0j1j2/gogi/sdk")) {
 		t.Fatalf("backend missing sdk import: %s", backend)
+	}
+}
+
+func TestRunDevStartsServer(t *testing.T) {
+	dir := t.TempDir()
+	oldCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldCwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.WriteFile(filepath.Join(dir, "gogi.toml"), []byte(`name = "sample"
+
+[build]
+package = "com.example.target"
+abis = ["arm64-v8a"]
+min_sdk = 24
+
+[overlay]
+enabled = true
+mode = "webview"
+
+[frontend]
+entry = "ui/index.html"
+
+[backend]
+entry = "backend"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	oldDevServer := devServer
+	var got devserver.Options
+	devServer = func(opts devserver.Options) error {
+		got = opts
+		return nil
+	}
+	t.Cleanup(func() { devServer = oldDevServer })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"dev", "--addr", "127.0.0.1:18080", "--proxy", "http://127.0.0.1:17373"}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if got.Addr != "127.0.0.1:18080" {
+		t.Fatalf("addr = %q", got.Addr)
+	}
+	if got.Proxy != "http://127.0.0.1:17373" {
+		t.Fatalf("proxy = %q", got.Proxy)
+	}
+	if got.FrontendDir != "ui" {
+		t.Fatalf("frontend dir = %q", got.FrontendDir)
 	}
 }

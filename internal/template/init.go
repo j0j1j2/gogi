@@ -71,8 +71,10 @@ func frontendIndexTemplate() string {
 <body>
   <main id="app">
     <h1>gogi</h1>
+    <button id="give-coins" type="button">Give coins</button>
     <section id="actions"></section>
   </main>
+  <script src="/gogi.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
@@ -117,13 +119,17 @@ func frontendScriptTemplate() string {
 	return `async function refresh() {
   const actions = document.getElementById("actions");
   try {
-    const response = await fetch("/api/state");
-    const state = await response.json();
+    const state = await gogi.state();
     actions.textContent = JSON.stringify(state, null, 2);
   } catch (error) {
     actions.textContent = String(error);
   }
 }
+
+document.getElementById("give-coins").addEventListener("click", async () => {
+  await gogi.action("give_coins", {amount: 10});
+  await refresh();
+});
 
 refresh();
 `
@@ -136,6 +142,11 @@ import "github.com/j0j1j2/gogi/sdk"
 
 func Init(ctx *sdk.Context) {
 	ctx.Logf("backend initialized")
+
+	ctx.Action("give_coins", func(req sdk.ActionRequest) (any, error) {
+		ctx.Logf("give_coins called with %s", string(req.Payload))
+		return map[string]any{"ok": true}, nil
+	})
 
 	// Register memory patches in Go so editor completion and type checking work.
 	// ctx.RegisterPatch(sdk.Patch{

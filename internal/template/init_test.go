@@ -41,4 +41,15 @@ func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 	if !strings.Contains(string(backend), "func Init(ctx *sdk.Context)") {
 		t.Fatalf("backend should use *sdk.Context: %s", backend)
 	}
+	if !strings.Contains(string(backend), `ctx.Action("give_coins"`) {
+		t.Fatalf("backend should include action sample: %s", backend)
+	}
+
+	frontend, err := os.ReadFile(filepath.Join(root, "frontend", "main.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(frontend), "gogi.state()") || !strings.Contains(string(frontend), `gogi.action("give_coins"`) {
+		t.Fatalf("frontend should use gogi client API: %s", frontend)
+	}
 }

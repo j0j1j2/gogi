@@ -1,6 +1,7 @@
 package control
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 type Registry struct {
 	mu      sync.RWMutex
 	patches map[string]PatchRecord
+	actions map[string]ActionSpec
 	applier PatchApplier
 }
 
@@ -26,10 +28,27 @@ type PatchRecord struct {
 
 type State struct {
 	Patches map[string]PatchRecord `json:"patches"`
+	Actions map[string]ActionInfo  `json:"actions"`
 }
 
 func NewRegistry() *Registry {
-	return &Registry{patches: map[string]PatchRecord{}}
+	return &Registry{patches: map[string]PatchRecord{}, actions: map[string]ActionSpec{}}
+}
+
+type ActionRequest struct {
+	ID      string
+	Payload json.RawMessage
+}
+
+type ActionHandler func(req ActionRequest) (any, error)
+
+type ActionSpec struct {
+	ID      string
+	Handler ActionHandler `json:"-"`
+}
+
+type ActionInfo struct {
+	ID string `json:"id"`
 }
 
 func (r *Registry) SetApplier(applier PatchApplier) {
@@ -70,12 +89,34 @@ func (r *Registry) Toggle(id string, enabled bool) error {
 	return nil
 }
 
+func (r *Registry) RegisterAction(spec ActionSpec) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.actions[spec.ID] = spec
+}
+
+func (r *Registry) DispatchAction(id string, payload json.RawMessage) (any, error) {
+	r.mu.RLock()
+	action, ok := r.actions[id]
+	r.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("unknown action %q", id)
+	}
+	if action.Handler == nil {
+		return nil, fmt.Errorf("action %q has no handler", id)
+	}
+	return action.Handler(ActionRequest{ID: id, Payload: payload})
+}
+
 func (r *Registry) Snapshot() State {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	out := State{Patches: map[string]PatchRecord{}}
+	out := State{Patches: map[string]PatchRecord{}, Actions: map[string]ActionInfo{}}
 	for id, record := range r.patches {
 		out.Patches[id] = record
+	}
+	for id := range r.actions {
+		out.Actions[id] = ActionInfo{ID: id}
 	}
 	return out
 }

@@ -3,11 +3,13 @@ package menu
 import (
 	"embed"
 	"encoding/json"
+	"io"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 
+	"github.com/j0j1j2/gogi/internal/webclient"
 	"github.com/j0j1j2/gogi/payload/control"
 )
 
@@ -45,6 +47,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/toggle/", s.handleToggle)
+	mux.HandleFunc("/api/action/", s.handleAction)
+	mux.HandleFunc("/gogi.js", s.handleClientScript)
 	mux.HandleFunc("/", s.handleAsset)
 	return mux
 }
@@ -66,6 +70,31 @@ func (s *Server) handleToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.handleState(w, r)
+}
+
+func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/action/")
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := s.registry.DispatchAction(id, json.RawMessage(payload))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("content-type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": result})
+}
+
+func (s *Server) handleClientScript(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/javascript")
+	_, _ = io.WriteString(w, webclient.Script)
 }
 
 func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {

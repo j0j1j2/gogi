@@ -47,6 +47,7 @@ gogi init mymod
 cd mymod
 
 gogi validate
+gogi dev
 gogi compile
 gogi build --apk target.apk --out target-gogi.apk
 ```
@@ -120,21 +121,80 @@ Available endpoints:
 GET  /api/state
 POST /api/toggle/<id>?enabled=true
 POST /api/toggle/<id>?enabled=false
+POST /api/action/<id>
 ```
 
-The generated `frontend/main.js` shows the basic pattern:
+The generated `frontend/main.js` uses the browser client from `/gogi.js`:
 
 ```js
 async function refresh() {
-  const response = await fetch("/api/state");
-  const state = await response.json();
+  const state = await gogi.state();
   document.getElementById("actions").textContent = JSON.stringify(state, null, 2);
 }
+
+document.getElementById("give-coins").addEventListener("click", async () => {
+  await gogi.action("give_coins", {amount: 10});
+  await refresh();
+});
 
 refresh();
 ```
 
 You can replace `frontend/index.html`, `frontend/style.css`, and `frontend/main.js` with your own menu UI.
+
+### Frontend Dev Server
+
+Run a local preview server while editing `frontend/`:
+
+```bash
+gogi dev
+```
+
+Default URL:
+
+```text
+http://127.0.0.1:17374
+```
+
+The dev server serves your HTML/CSS/JS, injects a small live-reload script into HTML responses, and provides a mock API for local UI work.
+
+Use `--proxy` when you want the browser preview to talk to a real running payload server instead of the mock API:
+
+```bash
+gogi dev --proxy http://127.0.0.1:17373
+```
+
+Useful flags:
+
+```text
+--addr 127.0.0.1:17374   listen address
+--frontend frontend      frontend directory override
+--proxy <url>            forward /api/* to a running payload server
+```
+
+### Frontend Client API
+
+Include the gogi browser client:
+
+```html
+<script src="/gogi.js"></script>
+```
+
+Then call the menu API through `window.gogi` instead of raw `fetch`:
+
+```js
+const state = await gogi.state();
+await gogi.toggle("unlock_feature", true);
+await gogi.action("give_coins", {amount: 10});
+```
+
+Available methods:
+
+```text
+gogi.state()                 GET /api/state
+gogi.toggle(id, enabled)     POST /api/toggle/<id>?enabled=true|false
+gogi.action(id, payload)     POST /api/action/<id>
+```
 
 ## Backend
 
@@ -178,6 +238,7 @@ Currently supported runtime-connected API:
 
 ```go
 func (ctx *sdk.Context) RegisterPatch(patch sdk.Patch)
+func (ctx *sdk.Context) Action(id string, handler sdk.ActionHandler)
 ```
 
 Registers a memory patch in the runtime registry:
@@ -193,6 +254,21 @@ ctx.RegisterPatch(sdk.Patch{
 })
 ```
 
+Registers a custom backend action:
+
+```go
+ctx.Action("give_coins", func(req sdk.ActionRequest) (any, error) {
+    ctx.Logf("give_coins payload: %s", string(req.Payload))
+    return map[string]any{"ok": true}, nil
+})
+```
+
+Frontend code can call that action with:
+
+```js
+await gogi.action("give_coins", {amount: 10});
+```
+
 `sdk.Patch` fields:
 
 ```go
@@ -204,6 +280,17 @@ type Patch struct {
     Replace []byte
     Startup bool
 }
+```
+
+Action types:
+
+```go
+type ActionRequest struct {
+    ID      string
+    Payload []byte
+}
+
+type ActionHandler func(req ActionRequest) (any, error)
 ```
 
 - `ID`: unique patch ID shown through `/api/state`

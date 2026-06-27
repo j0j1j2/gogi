@@ -121,3 +121,16 @@ func TestClientScriptEndpoint(t *testing.T) {
 		t.Fatalf("client script missing window.gogi: %s", rec.Body.String())
 	}
 }
+
+func TestFaviconEndpointDoesNot404(t *testing.T) {
+	reg := control.NewRegistry()
+	server := NewServer(reg)
+
+	req := httptest.NewRequest(http.MethodGet, "/favicon.ico", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}

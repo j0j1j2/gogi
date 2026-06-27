@@ -81,6 +81,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveVersion(w)
 	case "/gogi.js":
 		h.serveClientScript(w)
+	case "/favicon.ico":
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		h.serveFrontend(w, r)
 	}

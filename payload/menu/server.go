@@ -49,6 +49,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/toggle/", s.handleToggle)
 	mux.HandleFunc("/api/action/", s.handleAction)
 	mux.HandleFunc("/gogi.js", s.handleClientScript)
+	mux.HandleFunc("/favicon.ico", s.handleFavicon)
 	mux.HandleFunc("/", s.handleAsset)
 	return mux
 }
@@ -95,6 +96,10 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleClientScript(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/javascript")
 	_, _ = io.WriteString(w, webclient.Script)
+}
+
+func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {

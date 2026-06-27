@@ -83,6 +83,18 @@ func TestHandlerMocksAction(t *testing.T) {
 	}
 }
 
+func TestHandlerIgnoresFavicon(t *testing.T) {
+	handler := NewHandler(Options{})
+
+	req := httptest.NewRequest(http.MethodGet, "/favicon.ico", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("favicon status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandlerProxiesAPI(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/state" {

@@ -23,8 +23,8 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	if !strings.Contains(html, `class="gogi-phone"`) || !strings.Contains(html, `src="/gogi-dev/app/"`) {
 		t.Fatalf("root response missing phone preview shell: %s", html)
 	}
-	if !strings.Contains(html, `class="gogi-log-panel"`) || !strings.Contains(html, `/gogi-dev/logs`) {
-		t.Fatalf("root response missing activity log panel: %s", html)
+	if !strings.Contains(html, `class="gogi-debug-panel gogi-log-panel"`) || !strings.Contains(html, `Debug panel`) || !strings.Contains(html, `/gogi-dev/logs`) {
+		t.Fatalf("root response missing debug panel view: %s", html)
 	}
 	if !strings.Contains(html, `id="gogi-toast"`) || !strings.Contains(html, `id="gogi-memory-list"`) {
 		t.Fatalf("root response missing visible event and memory indicators: %s", html)

@@ -537,9 +537,9 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       <section class="gogi-phone" aria-label="Phone preview">
         <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
       </section>
-      <aside class="gogi-log-panel" aria-label="Mock runtime activity">
+      <aside class="gogi-debug-panel gogi-log-panel" aria-label="Debug panel">
         <div class="gogi-log-head">
-          <strong>Runtime activity</strong>
+          <strong>Debug panel</strong>
           <span id="gogi-log-count">0 events</span>
         </div>
         <div class="gogi-live-status" id="gogi-live-status">

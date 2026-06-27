@@ -127,17 +127,21 @@ POST /api/action/<id>
 The generated `frontend/main.js` uses the browser client from `/gogi.js`:
 
 ```js
-async function refresh() {
-  const state = await gogi.state();
-  document.getElementById("actions").textContent = JSON.stringify(state, null, 2);
-}
+const status = document.getElementById("status");
+const giveCoins = document.getElementById("give-coins");
 
-document.getElementById("give-coins").addEventListener("click", async () => {
-  await gogi.action("give_coins", {amount: 10});
-  await refresh();
+giveCoins.addEventListener("click", async () => {
+  giveCoins.disabled = true;
+  status.textContent = "Sending...";
+  try {
+    await gogi.action("give_coins", {amount: 10});
+    status.textContent = "Sent";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    giveCoins.disabled = false;
+  }
 });
-
-refresh();
 ```
 
 You can replace `frontend/index.html`, `frontend/style.css`, and `frontend/main.js` with your own menu UI.
@@ -157,7 +161,7 @@ Default URL:
 http://127.0.0.1:17374
 ```
 
-The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work. The preview shell also shows a runtime activity panel with a latest-event indicator, toast notifications, an event list, and mock memory patch state, so mock actions and memory patch toggles are visible while you interact with the menu.
+The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work. Debug state is shown outside the app in the `gogi dev` Debug panel, with a latest-event indicator, toast notifications, an event list, and mock memory patch state.
 
 If the requested port is already in use, `gogi dev` tries the next ports and prints the actual URL it selected:
 

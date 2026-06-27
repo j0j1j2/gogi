@@ -49,7 +49,13 @@ func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(frontend), "gogi.state()") || !strings.Contains(string(frontend), `gogi.action("give_coins"`) {
+	if !strings.Contains(string(frontend), `gogi.action("give_coins"`) {
 		t.Fatalf("frontend should use gogi client API: %s", frontend)
+	}
+	if strings.Contains(string(frontend), "gogi.state()") {
+		t.Fatalf("frontend should leave state inspection to gogi dev debug panel: %s", frontend)
+	}
+	if strings.Contains(string(frontend), "JSON.stringify") {
+		t.Fatalf("frontend should not dump debug JSON in the app UI: %s", frontend)
 	}
 }

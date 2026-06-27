@@ -72,7 +72,7 @@ func frontendIndexTemplate() string {
   <main id="app">
     <h1>gogi</h1>
     <button id="give-coins" type="button">Give coins</button>
-    <section id="actions"></section>
+    <p id="status" class="status">Ready</p>
   </main>
   <script src="/gogi.js"></script>
   <script src="main.js"></script>
@@ -112,26 +112,36 @@ button {
   color: #ffffff;
   font: inherit;
 }
+
+button:disabled {
+  opacity: 0.65;
+}
+
+.status {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: #b8c4bd;
+  font-size: 13px;
+}
 `
 }
 
 func frontendScriptTemplate() string {
-	return `async function refresh() {
-  const actions = document.getElementById("actions");
+	return `const status = document.getElementById("status");
+const giveCoins = document.getElementById("give-coins");
+
+giveCoins.addEventListener("click", async () => {
+  giveCoins.disabled = true;
+  status.textContent = "Sending...";
   try {
-    const state = await gogi.state();
-    actions.textContent = JSON.stringify(state, null, 2);
+    await gogi.action("give_coins", {amount: 10});
+    status.textContent = "Sent";
   } catch (error) {
-    actions.textContent = String(error);
+    status.textContent = error.message;
+  } finally {
+    giveCoins.disabled = false;
   }
-}
-
-document.getElementById("give-coins").addEventListener("click", async () => {
-  await gogi.action("give_coins", {amount: 10});
-  await refresh();
 });
-
-refresh();
 `
 }
 

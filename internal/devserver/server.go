@@ -2,9 +2,11 @@ package devserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -14,16 +16,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/j0j1j2/gogi/internal/webclient"
 )
 
 type Options struct {
-	FrontendDir string
-	Addr        string
-	Proxy       string
-	Stdout      io.Writer
+	FrontendDir     string
+	Addr            string
+	Proxy           string
+	Stdout          io.Writer
+	PortSearchLimit int
 }
 
 type patchState struct {
@@ -59,14 +63,50 @@ func NewHandler(opts Options) http.Handler {
 }
 
 func Serve(opts Options) error {
-	addr := opts.Addr
-	if addr == "" {
-		addr = "127.0.0.1:17374"
+	listener, addr, err := Listen(opts)
+	if err != nil {
+		return err
 	}
 	if opts.Stdout != nil {
 		fmt.Fprintf(opts.Stdout, "dev server listening on http://%s\n", addr)
 	}
-	return http.ListenAndServe(addr, NewHandler(opts))
+	return http.Serve(listener, NewHandler(opts))
+}
+
+func Listen(opts Options) (net.Listener, string, error) {
+	addr := opts.Addr
+	if addr == "" {
+		addr = "127.0.0.1:17374"
+	}
+	limit := opts.PortSearchLimit
+	if limit <= 0 {
+		limit = 20
+	}
+	host, portText, err := net.SplitHostPort(addr)
+	if err != nil {
+		listener, listenErr := net.Listen("tcp", addr)
+		return listener, addr, listenErr
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port == 0 {
+		listener, listenErr := net.Listen("tcp", addr)
+		return listener, addr, listenErr
+	}
+	for offset := 0; offset < limit; offset++ {
+		candidate := net.JoinHostPort(host, strconv.Itoa(port+offset))
+		listener, err := net.Listen("tcp", candidate)
+		if err == nil {
+			return listener, listener.Addr().String(), nil
+		}
+		if !isAddrInUse(err) {
+			return nil, "", err
+		}
+	}
+	return nil, "", fmt.Errorf("no available port found from %s within %d attempts", addr, limit)
+}
+
+func isAddrInUse(err error) bool {
+	return errors.Is(err, syscall.EADDRINUSE)
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

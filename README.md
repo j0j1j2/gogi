@@ -158,6 +158,12 @@ http://127.0.0.1:17374
 
 The dev server serves your HTML/CSS/JS, injects a small live-reload script into HTML responses, and provides a mock API for local UI work.
 
+If the requested port is already in use, `gogi dev` tries the next ports and prints the actual URL it selected:
+
+```text
+dev server listening on http://127.0.0.1:17375
+```
+
 Use `--proxy` when you want the browser preview to talk to a real running payload server instead of the mock API:
 
 ```bash

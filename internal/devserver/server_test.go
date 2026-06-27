@@ -2,10 +2,12 @@ package devserver
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -119,6 +121,21 @@ func TestHandlerProxiesAPI(t *testing.T) {
 	}
 }
 
+func TestListenFallsBackWhenPortIsBusy(t *testing.T) {
+	busy, nextAddr := reservePortWithFreeNext(t)
+	t.Cleanup(func() { _ = busy.Close() })
+
+	listener, actual, err := Listen(Options{Addr: busy.Addr().String(), PortSearchLimit: 2})
+	if err != nil {
+		t.Fatalf("Listen returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+
+	if actual != nextAddr {
+		t.Fatalf("actual addr = %q, want %q", actual, nextAddr)
+	}
+}
+
 func getBody(t *testing.T, handler http.Handler, path string) string {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -135,4 +152,34 @@ func writeFile(t *testing.T, path string, data string) {
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func reservePortWithFreeNext(t *testing.T) (net.Listener, string) {
+	t.Helper()
+	for i := 0; i < 100; i++ {
+		busy, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, port, err := net.SplitHostPort(busy.Addr().String())
+		if err != nil {
+			_ = busy.Close()
+			t.Fatal(err)
+		}
+		next, err := strconv.Atoi(port)
+		if err != nil {
+			_ = busy.Close()
+			t.Fatal(err)
+		}
+		next++
+		nextAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(next))
+		probe, err := net.Listen("tcp", nextAddr)
+		if err == nil {
+			_ = probe.Close()
+			return busy, nextAddr
+		}
+		_ = busy.Close()
+	}
+	t.Fatal("could not find adjacent free ports")
+	return nil, ""
 }

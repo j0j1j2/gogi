@@ -17,7 +17,15 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "index.html"), "<html><body><main>menu</main></body></html>")
 	writeFile(t, filepath.Join(dir, "style.css"), "body { color: red; }")
 
-	handler := NewHandler(Options{FrontendDir: dir})
+	handler := NewHandler(Options{
+		FrontendDir: dir,
+		Overlay: OverlayOptions{
+			Width:         320,
+			Height:        420,
+			CollapsedSize: 56,
+			Draggable:     true,
+		},
+	})
 
 	html := getBody(t, handler, "/")
 	if !strings.Contains(html, `class="gogi-phone"`) || !strings.Contains(html, `src="/gogi-dev/app/"`) {
@@ -31,6 +39,12 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	}
 	if !strings.Contains(html, `id="gogi-toast"`) || !strings.Contains(html, `id="gogi-memory-list"`) {
 		t.Fatalf("root response missing visible event and memory indicators: %s", html)
+	}
+	if !strings.Contains(html, `class="gogi-overlay-window"`) || !strings.Contains(html, `gogi-overlay-bubble`) {
+		t.Fatalf("root response missing overlay frame and collapsed bubble: %s", html)
+	}
+	if !strings.Contains(html, `--overlay-width: 320px`) || !strings.Contains(html, `--overlay-height: 420px`) || !strings.Contains(html, `--overlay-bubble: 56px`) {
+		t.Fatalf("root response missing overlay sizing from config: %s", html)
 	}
 
 	app := getBody(t, handler, "/gogi-dev/app/")

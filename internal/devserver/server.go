@@ -28,6 +28,14 @@ type Options struct {
 	Proxy           string
 	Stdout          io.Writer
 	PortSearchLimit int
+	Overlay         OverlayOptions
+}
+
+type OverlayOptions struct {
+	Width         int
+	Height        int
+	CollapsedSize int
+	Draggable     bool
 }
 
 type patchState struct {
@@ -42,6 +50,7 @@ type patchSpec struct {
 type handler struct {
 	frontendDir string
 	api         http.Handler
+	overlay     OverlayOptions
 	mu          sync.Mutex
 	patches     map[string]patchState
 	events      []devEvent
@@ -61,6 +70,7 @@ func NewHandler(opts Options) http.Handler {
 	h := &handler{
 		frontendDir: opts.FrontendDir,
 		patches:     map[string]patchState{},
+		overlay:     opts.Overlay,
 	}
 	if h.frontendDir == "" {
 		h.frontendDir = "frontend"
@@ -151,6 +161,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) serveAPI(w http.ResponseWriter, r *http.Request) {
 	if h.api != nil {
+		h.recordProxyEvent(r)
 		h.api.ServeHTTP(w, r)
 		return
 	}
@@ -163,6 +174,30 @@ func (h *handler) serveAPI(w http.ResponseWriter, r *http.Request) {
 		h.serveAction(w, r)
 	default:
 		http.NotFound(w, r)
+	}
+}
+
+func (h *handler) recordProxyEvent(r *http.Request) {
+	switch {
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/toggle/"):
+		id := strings.TrimPrefix(r.URL.Path, "/api/toggle/")
+		enabled := r.URL.Query().Get("enabled") == "true"
+		h.mu.Lock()
+		h.patches[id] = patchState{Enabled: enabled, Spec: patchSpec{ID: id}}
+		h.appendEventLocked(devEvent{
+			Kind:    "memory",
+			Title:   "go backend memory",
+			Message: fmt.Sprintf("patch %s set to %t", id, enabled),
+			Detail:  fmt.Sprintf("backend://memory/patch/%s", id),
+		})
+		h.mu.Unlock()
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/action/"):
+		id := strings.TrimPrefix(r.URL.Path, "/api/action/")
+		h.appendEvent(devEvent{
+			Kind:    "action",
+			Title:   "go backend action",
+			Message: fmt.Sprintf("action %s invoked", id),
+		})
 	}
 }
 
@@ -254,9 +289,24 @@ func (h *handler) serveClientScript(w http.ResponseWriter) {
 	_, _ = io.WriteString(w, webclient.Script)
 }
 
+func (h *handler) resolvedOverlay() OverlayOptions {
+	overlay := h.overlay
+	if overlay.Width <= 0 {
+		overlay.Width = 320
+	}
+	if overlay.Height <= 0 {
+		overlay.Height = 420
+	}
+	if overlay.CollapsedSize <= 0 {
+		overlay.CollapsedSize = 56
+	}
+	return overlay
+}
+
 func (h *handler) servePreviewShell(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = io.WriteString(w, `<!doctype html>
+	overlay := h.resolvedOverlay()
+	html := `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -268,6 +318,9 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --gogi-preview-width: min(390px, calc(100vw - 32px));
       --gogi-preview-height: min(844px, calc(100vh - 86px));
+      --overlay-width: __OVERLAY_WIDTH__px;
+      --overlay-height: __OVERLAY_HEIGHT__px;
+      --overlay-bubble: __OVERLAY_BUBBLE__px;
       background: #171918;
       color: #edf2ef;
     }
@@ -327,6 +380,73 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       height: 100%;
       border: 0;
       background: #101312;
+    }
+    .gogi-overlay-window {
+      position: absolute;
+      left: 24px;
+      top: 72px;
+      width: min(var(--overlay-width), calc(100% - 48px));
+      height: min(var(--overlay-height), calc(100% - 122px));
+      border-radius: 13px;
+      overflow: hidden;
+      background: #111513;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 18px 52px rgba(0,0,0,0.45);
+      transition: width 160ms ease, height 160ms ease, border-radius 160ms ease;
+      z-index: 1;
+    }
+    .gogi-overlay-topbar {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 8px 0 10px;
+      background: #1c231f;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      color: #d7e1db;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .gogi-overlay-toggle {
+      width: 26px;
+      height: 26px;
+      border: 0;
+      border-radius: 999px;
+      background: #2f7d68;
+      color: #ffffff;
+      font: inherit;
+      cursor: pointer;
+    }
+    .gogi-overlay-frame {
+      width: 100%;
+      height: calc(100% - 34px);
+    }
+    .gogi-overlay-window.is-collapsed {
+      width: var(--overlay-bubble);
+      height: var(--overlay-bubble);
+      border-radius: 999px;
+    }
+    .gogi-overlay-window.is-collapsed .gogi-overlay-topbar {
+      height: 100%;
+      justify-content: center;
+      padding: 0;
+      border-bottom: 0;
+      background: #2f7d68;
+    }
+    .gogi-overlay-window.is-collapsed .gogi-overlay-title,
+    .gogi-overlay-window.is-collapsed .gogi-overlay-frame {
+      display: none;
+    }
+    .gogi-overlay-window.is-collapsed .gogi-overlay-toggle {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      font-size: 16px;
+    }
+    .gogi-overlay-meta {
+      color: #aeb8b2;
+      font-size: 11px;
     }
     .gogi-log-panel {
       width: min(360px, calc(100vw - 32px));
@@ -533,11 +653,19 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
   <main class="gogi-stage">
     <div class="gogi-toolbar">
       <strong>gogi dev</strong>
-      <span>390 x 844 preview</span>
+      <span>390 x 844 preview · overlay __OVERLAY_WIDTH__ x __OVERLAY_HEIGHT__</span>
     </div>
     <div class="gogi-workbench">
       <section class="gogi-phone" aria-label="Phone preview">
-        <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
+        <div class="gogi-overlay-window" id="gogi-overlay-window">
+          <div class="gogi-overlay-topbar">
+            <span class="gogi-overlay-title">WebView · __OVERLAY_WIDTH__ x __OVERLAY_HEIGHT__</span>
+            <button class="gogi-overlay-bubble gogi-overlay-toggle" id="gogi-overlay-toggle" type="button" aria-label="Collapse overlay">−</button>
+          </div>
+          <div class="gogi-overlay-frame">
+            <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
+          </div>
+        </div>
       </section>
       <aside class="gogi-debug-panel gogi-log-panel" aria-label="Debug panel">
         <div class="gogi-log-head">
@@ -572,8 +700,15 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
     const liveValue = document.getElementById("gogi-live-value");
     const memoryList = document.getElementById("gogi-memory-list");
     const memoryCount = document.getElementById("gogi-memory-count");
+    const overlayWindow = document.getElementById("gogi-overlay-window");
+    const overlayToggle = document.getElementById("gogi-overlay-toggle");
     let seenLatestEventID = 0;
     let toastTimer = 0;
+    overlayToggle.addEventListener("click", () => {
+      const collapsed = overlayWindow.classList.toggle("is-collapsed");
+      overlayToggle.textContent = collapsed ? "g" : "−";
+      overlayToggle.setAttribute("aria-label", collapsed ? "Expand overlay" : "Collapse overlay");
+    });
     function escapeText(value) {
       return String(value == null ? "" : value).replace(/[&<>"']/g, character => ({
         "&": "&amp;",
@@ -648,7 +783,11 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
   </script>
 </body>
 </html>
-`)
+`
+	html = strings.ReplaceAll(html, "__OVERLAY_WIDTH__", strconv.Itoa(overlay.Width))
+	html = strings.ReplaceAll(html, "__OVERLAY_HEIGHT__", strconv.Itoa(overlay.Height))
+	html = strings.ReplaceAll(html, "__OVERLAY_BUBBLE__", strconv.Itoa(overlay.CollapsedSize))
+	_, _ = io.WriteString(w, html)
 }
 
 func (h *handler) serveReloadJS(w http.ResponseWriter) {

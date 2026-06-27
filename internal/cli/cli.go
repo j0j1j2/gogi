@@ -12,6 +12,7 @@ import (
 
 	"github.com/j0j1j2/gogi/internal/apkbuild"
 	"github.com/j0j1j2/gogi/internal/buildenv"
+	"github.com/j0j1j2/gogi/internal/devbackend"
 	"github.com/j0j1j2/gogi/internal/devserver"
 	"github.com/j0j1j2/gogi/internal/project"
 	gogitemplate "github.com/j0j1j2/gogi/internal/template"
@@ -19,12 +20,20 @@ import (
 )
 
 type runCommandFunc func(name string, args []string, env map[string]string, stdout io.Writer, stderr io.Writer) error
+type devBackendStartFunc func(manifestPath string, stdout io.Writer, stderr io.Writer) (string, func(), error)
 
 var commandRunner runCommandFunc = runCommand
 var apkBuilder = apkbuild.BuildAPK
 var xapkBuilder = apkbuild.BuildXAPK
 var dependencyResolver = resolveProjectDependencies
 var devServer = devserver.Serve
+var devBackendStarter devBackendStartFunc = func(manifestPath string, stdout io.Writer, stderr io.Writer) (string, func(), error) {
+	url, cleanup, err := devbackend.Start(manifestPath, stdout, stderr)
+	if cleanup == nil {
+		return url, nil, err
+	}
+	return url, func() { cleanup() }, err
+}
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -116,11 +125,31 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 				return 2
 			}
 		}
+		var cleanup func()
+		if proxy == "" {
+			backendURL, backendCleanup, err := devBackendStarter("gogi.toml", stdout, stderr)
+			if err != nil {
+				fmt.Fprintf(stderr, "warning: start go backend dev runner: %v\n", err)
+			} else {
+				proxy = backendURL
+				cleanup = backendCleanup
+				fmt.Fprintf(stdout, "backend connected on %s\n", backendURL)
+			}
+		}
+		if cleanup != nil {
+			defer cleanup()
+		}
 		if err := devServer(devserver.Options{
 			FrontendDir: frontendDir,
 			Addr:        addr,
 			Proxy:       proxy,
 			Stdout:      stdout,
+			Overlay: devserver.OverlayOptions{
+				Width:         manifest.Overlay.Width,
+				Height:        manifest.Overlay.Height,
+				CollapsedSize: manifest.Overlay.CollapsedSize,
+				Draggable:     manifest.Overlay.Draggable,
+			},
 		}); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1

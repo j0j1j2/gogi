@@ -161,7 +161,9 @@ Default URL:
 http://127.0.0.1:17374
 ```
 
-The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, serves the actual frontend under `/gogi-dev/app/`, injects a small live-reload script into app HTML responses, and provides a mock API for local UI work. Debug state is shown outside the app in the `gogi dev` Debug panel, with a latest-event indicator, toast notifications, an event list, and mock memory patch state.
+The dev server requires `gogi.toml`. It serves a phone-shaped preview shell at `/`, renders your frontend inside a floating overlay frame using `[overlay]` width, height, and collapsed size, and injects a small live-reload script into app HTML responses. Debug state is shown outside the app in the `gogi dev` Debug panel, with a latest-event indicator, toast notifications, an event list, and memory patch state.
+
+By default, `gogi dev` also starts a local Go backend runner for your project. Calls such as `gogi.action("give_coins", ...)` execute the handler registered from your `backend.Init(ctx)` function. If that runner cannot start, the CLI prints a warning and the dev server falls back to the built-in mock API.
 
 If the requested port is already in use, `gogi dev` tries the next ports and prints the actual URL it selected:
 
@@ -169,7 +171,7 @@ If the requested port is already in use, `gogi dev` tries the next ports and pri
 dev server listening on http://127.0.0.1:17375
 ```
 
-Use `--proxy` when you want the browser preview to talk to a real running payload server instead of the mock API:
+Use `--proxy` when you want the browser preview to talk to a real running payload server or a custom API server instead of the local Go backend runner:
 
 ```bash
 gogi dev --proxy http://127.0.0.1:17373

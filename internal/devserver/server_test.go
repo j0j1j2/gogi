@@ -23,6 +23,9 @@ func TestHandlerServesFrontendAndInjectsReloadScript(t *testing.T) {
 	if !strings.Contains(html, `class="gogi-phone"`) || !strings.Contains(html, `src="/gogi-dev/app/"`) {
 		t.Fatalf("root response missing phone preview shell: %s", html)
 	}
+	if !strings.Contains(html, `class="gogi-log-panel"`) || !strings.Contains(html, `/gogi-dev/logs`) {
+		t.Fatalf("root response missing activity log panel: %s", html)
+	}
 
 	app := getBody(t, handler, "/gogi-dev/app/")
 	if !strings.Contains(app, "<main>menu</main>") {
@@ -65,6 +68,11 @@ func TestHandlerTogglesMockPatch(t *testing.T) {
 	if !strings.Contains(body, `"example"`) || !strings.Contains(body, `"Enabled":true`) {
 		t.Fatalf("state did not preserve toggle: %s", body)
 	}
+
+	logs := getBody(t, handler, "/gogi-dev/logs")
+	if !strings.Contains(logs, "mock memory") || !strings.Contains(logs, "example") {
+		t.Fatalf("logs missing mock memory toggle event: %s", logs)
+	}
 }
 
 func TestHandlerServesClientScript(t *testing.T) {
@@ -87,6 +95,11 @@ func TestHandlerMocksAction(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"id":"give_coins"`) {
 		t.Fatalf("action response = %s", rec.Body.String())
+	}
+
+	logs := getBody(t, handler, "/gogi-dev/logs")
+	if !strings.Contains(logs, "mock action") || !strings.Contains(logs, "give_coins") {
+		t.Fatalf("logs missing mock action event: %s", logs)
 	}
 }
 

@@ -44,6 +44,17 @@ type handler struct {
 	api         http.Handler
 	mu          sync.Mutex
 	patches     map[string]patchState
+	events      []devEvent
+	nextEventID int
+}
+
+type devEvent struct {
+	ID      int    `json:"id"`
+	Time    string `json:"time"`
+	Kind    string `json:"kind"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+	Detail  string `json:"detail,omitempty"`
 }
 
 func NewHandler(opts Options) http.Handler {
@@ -119,6 +130,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveReloadJS(w)
 	case "/gogi-dev/version":
 		h.serveVersion(w)
+	case "/gogi-dev/logs":
+		h.serveLogs(w)
 	case "/gogi.js":
 		h.serveClientScript(w)
 	case "/favicon.ico":
@@ -172,6 +185,12 @@ func (h *handler) serveToggle(w http.ResponseWriter, r *http.Request) {
 	}
 	h.mu.Lock()
 	h.patches[id] = patchState{Enabled: enabled, Spec: patchSpec{ID: id}}
+	h.appendEventLocked(devEvent{
+		Kind:    "memory",
+		Title:   "mock memory",
+		Message: fmt.Sprintf("patch %s set to %t", id, enabled),
+		Detail:  fmt.Sprintf("mock://memory/patch/%s", id),
+	})
 	h.mu.Unlock()
 	writeJSON(w, map[string]any{"ok": true})
 }
@@ -187,6 +206,12 @@ func (h *handler) serveAction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	h.appendEvent(devEvent{
+		Kind:    "action",
+		Title:   "mock action",
+		Message: fmt.Sprintf("action %s invoked", id),
+		Detail:  string(payload),
+	})
 	writeJSON(w, map[string]any{
 		"ok": true,
 		"result": map[string]any{
@@ -194,6 +219,30 @@ func (h *handler) serveAction(w http.ResponseWriter, r *http.Request) {
 			"payload": json.RawMessage(payload),
 		},
 	})
+}
+
+func (h *handler) appendEvent(event devEvent) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.appendEventLocked(event)
+}
+
+func (h *handler) appendEventLocked(event devEvent) {
+	h.nextEventID++
+	event.ID = h.nextEventID
+	event.Time = time.Now().Format("15:04:05")
+	h.events = append(h.events, event)
+	if len(h.events) > 200 {
+		h.events = h.events[len(h.events)-200:]
+	}
+}
+
+func (h *handler) serveLogs(w http.ResponseWriter) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	events := make([]devEvent, len(h.events))
+	copy(events, h.events)
+	writeJSON(w, map[string]any{"events": events})
 }
 
 func (h *handler) serveClientScript(w http.ResponseWriter) {
@@ -230,6 +279,12 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       display: grid;
       gap: 14px;
       justify-items: center;
+    }
+    .gogi-workbench {
+      display: grid;
+      grid-template-columns: minmax(280px, 390px) minmax(280px, 360px);
+      gap: 22px;
+      align-items: start;
     }
     .gogi-toolbar {
       width: min(390px, calc(100vw - 32px));
@@ -268,9 +323,94 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       border: 0;
       background: #101312;
     }
+    .gogi-log-panel {
+      width: min(360px, calc(100vw - 32px));
+      max-height: calc(100vh - 86px);
+      min-height: 460px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      background: #202420;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+      overflow: hidden;
+    }
+    .gogi-log-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .gogi-log-head strong {
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+    .gogi-log-head span {
+      color: #9ba79f;
+      font-size: 12px;
+    }
+    .gogi-log-list {
+      display: grid;
+      gap: 10px;
+      max-height: calc(100vh - 160px);
+      margin: 0;
+      padding: 14px 0 2px;
+      overflow: auto;
+      list-style: none;
+    }
+    .gogi-log-empty {
+      color: #89958d;
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 14px 0;
+    }
+    .gogi-log-item {
+      display: grid;
+      gap: 6px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: #151916;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .gogi-log-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #f0f5f1;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .gogi-log-time {
+      color: #8f9b93;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .gogi-log-message {
+      color: #c8d2cc;
+      font-size: 12px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .gogi-log-detail {
+      color: #88bfae;
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 880px) {
+      body { align-items: start; }
+      .gogi-workbench {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+      .gogi-log-panel {
+        min-height: 220px;
+      }
+    }
     @media (max-width: 460px) {
       body { padding: 0; background: #101312; }
-      .gogi-toolbar { display: none; }
+      .gogi-toolbar, .gogi-log-panel { display: none; }
       .gogi-stage, .gogi-phone {
         width: 100vw;
         height: 100vh;
@@ -291,10 +431,59 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       <strong>gogi dev</strong>
       <span>390 x 844 preview</span>
     </div>
-    <section class="gogi-phone" aria-label="Phone preview">
-      <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
-    </section>
+    <div class="gogi-workbench">
+      <section class="gogi-phone" aria-label="Phone preview">
+        <iframe class="gogi-screen" src="/gogi-dev/app/" title="gogi frontend preview"></iframe>
+      </section>
+      <aside class="gogi-log-panel" aria-label="Mock runtime activity">
+        <div class="gogi-log-head">
+          <strong>Runtime activity</strong>
+          <span id="gogi-log-count">0 events</span>
+        </div>
+        <ul class="gogi-log-list" id="gogi-log-list">
+          <li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>
+        </ul>
+      </aside>
+    </div>
   </main>
+  <script>
+    const list = document.getElementById("gogi-log-list");
+    const count = document.getElementById("gogi-log-count");
+    function escapeText(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      })[character]);
+    }
+    async function refreshLogs() {
+      try {
+        const response = await fetch("/gogi-dev/logs", {cache: "no-store"});
+        const state = await response.json();
+        const events = state.events || [];
+        count.textContent = events.length + (events.length === 1 ? " event" : " events");
+        if (events.length === 0) {
+          list.innerHTML = '<li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>';
+          return;
+        }
+        list.innerHTML = events.slice().reverse().map(event => {
+          const detail = event.detail ? '<div class="gogi-log-detail">' + escapeText(event.detail) + '</div>' : "";
+          return '<li class="gogi-log-item">' +
+            '<div class="gogi-log-line">' +
+            '<span>' + escapeText(event.title || event.kind) + '</span>' +
+            '<span class="gogi-log-time">' + escapeText(event.time) + '</span>' +
+            '</div>' +
+            '<div class="gogi-log-message">' + escapeText(event.message) + '</div>' +
+            detail +
+            '</li>';
+        }).join("");
+      } catch (_) {}
+    }
+    setInterval(refreshLogs, 650);
+    refreshLogs();
+  </script>
 </body>
 </html>
 `)

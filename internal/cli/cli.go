@@ -218,6 +218,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			"GOARCH":      cfg.GoArch,
 			"CGO_ENABLED": "1",
 			"CC":          cfg.CC,
+			"GOPROXY":     "direct",
 		}
 		payloadPkg, err := payloadPackage(manifest)
 		if err != nil {
@@ -225,7 +226,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 1
 		}
 		if payloadPkg == generatedPayloadPackage {
-			if err := commandRunner("go", []string{"get", "github.com/j0j1j2/gogi@latest"}, buildEnv, stdout, stderr); err != nil {
+			if err := commandRunner("go", []string{"get", "github.com/j0j1j2/gogi@main"}, buildEnv, stdout, stderr); err != nil {
 				fmt.Fprintln(stderr, err)
 				return 1
 			}
@@ -381,10 +382,11 @@ func runCommand(name string, args []string, env map[string]string, stdout io.Wri
 }
 
 func resolveProjectDependencies(root string, stdout io.Writer, stderr io.Writer) error {
-	cmd := exec.Command("go", "get", "github.com/j0j1j2/gogi@latest")
+	cmd := exec.Command("go", "get", "github.com/j0j1j2/gogi@main")
 	cmd.Dir = root
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	cmd.Env = append(os.Environ(), "GOPROXY=direct")
 	return cmd.Run()
 }
 

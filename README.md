@@ -22,8 +22,16 @@ gogi.toml   Android build and overlay configuration
 
 ## Install
 
+Stable install:
+
 ```bash
 go install github.com/j0j1j2/gogi/cmd/gogi@latest
+```
+
+Install or refresh from the active `main` branch:
+
+```bash
+GOPROXY=direct go install github.com/j0j1j2/gogi/cmd/gogi@main
 ```
 
 Make sure your Go bin directory is on `PATH`:
@@ -38,7 +46,7 @@ Check the CLI:
 gogi version
 ```
 
-`gogi version` prints the installed module version and commit, which is the easiest way to confirm `go install ...@latest` picked up an update.
+`gogi version` prints the installed module version and commit. Use the `GOPROXY=direct ...@main` command when you need to confirm a freshly pushed update immediately.
 
 ## Quick Start
 
@@ -70,6 +78,7 @@ After `gogi init mymod`:
 
 ```text
 mymod/
+  .gitignore
   go.mod
   gogi.toml
   frontend/
@@ -80,7 +89,7 @@ mymod/
     main.go
 ```
 
-`gogi compile` generates an internal `.gogi/build` package, embeds `frontend/`, calls `backend.Init(ctx)` with a typed `*sdk.Context`, and builds an Android `c-shared` library.
+`gogi compile` generates an internal `.gogi/build` package, embeds `frontend/`, calls `backend.Init(ctx)` with a typed `*sdk.Context`, and builds an Android `c-shared` library. `gogi dev` also creates `.gogi/devbackend` while the local Go backend runner is active. Generated projects ignore `.gogi/` and `dist/` by default.
 
 ## Configuration
 

@@ -674,19 +674,19 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
         </div>
         <div class="gogi-live-status" id="gogi-live-status">
           <span class="gogi-live-label">Latest event</span>
-          <span class="gogi-live-value" id="gogi-live-value">No mock events yet</span>
+          <span class="gogi-live-value" id="gogi-live-value">No events yet</span>
         </div>
-        <section class="gogi-memory-card" aria-label="Mock memory state">
+        <section class="gogi-memory-card" aria-label="Memory patch state">
           <div class="gogi-memory-head">
-            <span>Mock memory</span>
+            <span>Memory patches</span>
             <span id="gogi-memory-count">0 patches</span>
           </div>
           <div class="gogi-memory-list" id="gogi-memory-list">
-            <div class="gogi-log-empty">No mock memory edits yet.</div>
+            <div class="gogi-log-empty">No memory edits yet.</div>
           </div>
         </section>
         <ul class="gogi-log-list" id="gogi-log-list">
-          <li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>
+          <li class="gogi-log-empty">Interact with the preview to see actions and memory edits.</li>
         </ul>
       </aside>
     </div>
@@ -729,7 +729,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
         renderMemory(patches);
         if (latest) renderLatest(latest);
         if (events.length === 0) {
-          list.innerHTML = '<li class="gogi-log-empty">Interact with the preview to see mock actions and memory edits.</li>';
+          list.innerHTML = '<li class="gogi-log-empty">Interact with the preview to see actions and memory edits.</li>';
           return;
         }
         list.innerHTML = events.slice().reverse().map(event => {
@@ -761,7 +761,7 @@ func (h *handler) servePreviewShell(w http.ResponseWriter) {
       const entries = Object.entries(patches);
       memoryCount.textContent = entries.length + (entries.length === 1 ? " patch" : " patches");
       if (entries.length === 0) {
-        memoryList.innerHTML = '<div class="gogi-log-empty">No mock memory edits yet.</div>';
+        memoryList.innerHTML = '<div class="gogi-log-empty">No memory edits yet.</div>';
         return;
       }
       memoryList.innerHTML = entries.map(([id, record]) => {

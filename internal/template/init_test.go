@@ -14,6 +14,7 @@ func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 	}
 
 	required := []string{
+		".gitignore",
 		"go.mod",
 		"gogi.toml",
 		"frontend/index.html",
@@ -29,6 +30,14 @@ func TestInitProjectCreatesFrontendBackendAndConfig(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(root, "payload")); !os.IsNotExist(err) {
 		t.Fatalf("init must not create user-editable payload directory, stat err=%v", err)
+	}
+
+	gitignore, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(gitignore), ".gogi/") || !strings.Contains(string(gitignore), "dist/") {
+		t.Fatalf(".gitignore should hide generated gogi outputs: %s", gitignore)
 	}
 
 	backend, err := os.ReadFile(filepath.Join(root, "backend", "main.go"))

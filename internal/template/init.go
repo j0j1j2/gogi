@@ -8,6 +8,7 @@ import (
 
 func InitProject(root string, name string) error {
 	files := map[string]string{
+		".gitignore":          gitignoreTemplate(),
 		"go.mod":              goModTemplate(name),
 		"gogi.toml":           manifestTemplate(name),
 		"frontend/index.html": frontendIndexTemplate(),
@@ -26,6 +27,12 @@ func InitProject(root string, name string) error {
 		}
 	}
 	return nil
+}
+
+func gitignoreTemplate() string {
+	return `dist/
+.gogi/
+`
 }
 
 func goModTemplate(name string) string {

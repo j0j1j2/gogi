@@ -222,6 +222,82 @@ entry = "backend"
 	}
 }
 
+func TestCompileCommandRefreshesGeneratedPayloadDependencyFromMain(t *testing.T) {
+	dir := t.TempDir()
+	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android24-clang")
+	if err := os.MkdirAll(filepath.Dir(clang), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(clang, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gogi.toml"), []byte(`name = "sample"
+
+[build]
+package = "com.example.target"
+abis = ["arm64-v8a"]
+min_sdk = 24
+
+[overlay]
+enabled = true
+mode = "webview"
+
+[frontend]
+entry = "frontend/index.html"
+
+[backend]
+entry = "backend"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module sample\n\ngo 1.25\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "frontend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "frontend", "index.html"), []byte("<main>sample</main>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	t.Setenv("ANDROID_NDK_HOME", filepath.Join(dir, "ndk"))
+	t.Setenv("ANDROID_NDK_ROOT", "")
+
+	var commands []string
+	var getEnv map[string]string
+	oldRunner := commandRunner
+	commandRunner = func(name string, args []string, env map[string]string, stdout, stderr io.Writer) error {
+		commands = append(commands, name+" "+strings.Join(args, " "))
+		if len(args) >= 2 && args[0] == "get" {
+			getEnv = env
+		}
+		return nil
+	}
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := Run([]string{"compile"}, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d, stderr=%q", code, errOut.String())
+	}
+	if len(commands) < 2 || commands[0] != "go get github.com/j0j1j2/gogi@main" {
+		t.Fatalf("expected generated payload dependency refresh before build, commands=%v", commands)
+	}
+	if getEnv["GOPROXY"] != "direct" {
+		t.Fatalf("GOPROXY = %q, want direct", getEnv["GOPROXY"])
+	}
+}
+
 func TestBuildCommandCompilesAndBuildsAPK(t *testing.T) {
 	dir := t.TempDir()
 	clang := filepath.Join(dir, "ndk", "toolchains", "llvm", "prebuilt", defaultHostTag(), "bin", "aarch64-linux-android24-clang")
